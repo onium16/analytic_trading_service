@@ -1,0 +1,57 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Logs and error reports
+logs/
+*.log
+*.log.[0-9]
+*.err
+
+# Virtual environments
+venv/
+newvenv/
+
+# Pytest and mypy cache
+.pytest_cache/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.eggs/
+
+# Datasets (can be huge and/or proprietary)
+datasets/
+datasets2/
+*.data.zip
+
+# IDE/editor configs
+.vscode/
+.idea/
+
+# Local environment / config
+.env
+
+# Metadata and preprocessed configs
+metadata/
+metadata_dropped/
+preprocessed_configs/
+
+# Reports / outputs / plots / archives
+# reports/
+# *.png
+# *.jpg
+# *.jpeg
+*.zip
+
+# Ignore symlinks
+*.lnk
+
+# Git 
+!.gitignore
+
+# Optional if you use ClickHouse schema dumps
+*.sql

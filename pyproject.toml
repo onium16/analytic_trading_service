@@ -1,0 +1,36 @@
+# pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+"infrastructure.config" = ["*.json"]
+
+[project]
+name = "quant-challenge"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas==2.3.0",
+    "numpy==2.3.1",
+    "aiohttp==3.12.13",
+    "websockets==15.0.1",
+    "backtesting==0.6.4",
+    "python-dotenv==1.1.1",
+    "pybit==5.11.0",
+    "aiochclient==2.6.0",
+    "pydantic==2.11.7",
+    "pydantic-settings==2.10.1",
+    "clickhouse-connect==0.8.18",
+    "plotly==6.2.0",
+    "tqdm==4.67.1",
+    "asynch==0.3.0",
+    "matplotlib==3.10.3"
+]
+
+[project.optional-dependencies]
+# Для тестирования
+testing = [
+    "pytest==8.4.1",         
+    "pytest-asyncio==1.0.0"
+]
