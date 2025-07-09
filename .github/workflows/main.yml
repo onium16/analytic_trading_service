@@ -18,7 +18,7 @@ jobs:
           - 9000:9000 # TCP порт (хост:контейнер) - мапим 9000 на стандартный 9000
         env:
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: "" # Пароль установлен на пустую строку, как в .env
+          CLICKHOUSE_PASSWORD: password  # Пароль установлен на пустую строку, как в .env
           CLICKHOUSE_DB_NAME: oraculv2 # Имя базы данных
           CLICKHOUSE_PORT_HTTP: 8123 # HTTP порт ClickHouse
           CLICKHOUSE_PORT_TCP: 9000 # TCP порт ClickHouse (внутри контейнера)
@@ -55,11 +55,11 @@ jobs:
       BINANCE_TEST_KLINE_URL: https://testnet.binance.vision/api/v3/klines
 
       # ClickHouse connection (для clickhouse-client и Pydantic)
-      CLICKHOUSE_HOST: localhost # Для доступа через проброшенные порты на хосте
-      CLICKHOUSE_PORT: 9000 # Используем проброшенный TCP порт (хост-порт 9000)
-      CLICKHOUSE_USER: default # Используется clickhouse-client
-      CLICKHOUSE_LOGIN: default # Используется clickhouse-client
-      CLICKHOUSE_PASSWORD: "" # Пароль установлен на пустую строку
+      CLICKHOUSE_HOST: localhost
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_LOGIN: default
+      CLICKHOUSE_PASSWORD: password
 
       # ClickHouse DB settings (для Pydantic)
       CLICKHOUSE_DB_NAME: oraculv2
