@@ -328,8 +328,8 @@ class DataPipelineService:
                         f"Время: {start_time_df} - {end_time_df}")
 
             combined_df = await prepare_backtest_data(
-                repo_kline=self.repo_kline_init, # Use the initial repo for _backtest_data as it's not a write operation
-                repo_orderbook=self.repo_orderbook_init, # Same here
+                repo_kline=self.repo_kline_init,
+                repo_orderbook=self.repo_orderbook_init,
                 start_time=start_time_df,
                 end_time=end_time_df,
                 database_mode=False,

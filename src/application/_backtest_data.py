@@ -69,7 +69,7 @@ async def prepare_backtest_data(
         # Асинхронная загрузка
         try:
             kline_df = await repo_kline.fetch_dataframe(kline_query)
-            if kline_df.empty:
+            if kline_df is None or kline_df.empty:
                 logger.warning(f"Нет данных в таблице {repo_kline.db}.{repo_kline.table_name} за период {start_str} - {end_str}")
                 kline_df = pd.DataFrame()
             logger.debug(f"Kline columns: {kline_df.columns.tolist()}")
@@ -80,7 +80,7 @@ async def prepare_backtest_data(
 
         try:
             orderbook_df = await repo_orderbook.fetch_dataframe(orderbook_query)
-            if orderbook_df.empty:
+            if orderbook_df is None or orderbook_df.empty:
                 orderbook_df = pd.DataFrame()
                 logger.warning(f"Нет данных в таблице {repo_orderbook.db}.{repo_orderbook.table_name} за период {start_str} - {end_str}")
             logger.debug(f"Orderbook columns: {orderbook_df.columns.tolist()}")
@@ -88,7 +88,7 @@ async def prepare_backtest_data(
             logger.exception("Ошибка при получении данных из OrderBook таблицы")
             raise
 
-        if kline_df.empty and orderbook_df.empty:
+        if (kline_df is None or kline_df.empty) and (orderbook_df is None or orderbook_df.empty):
             logger.warning(f"Данные за период {start_str} - {end_str} для дальнейшей работы отсутствуют")
             return pd.DataFrame()
 
@@ -102,7 +102,7 @@ async def prepare_backtest_data(
             raise ValueError("orderbook_df не найден или пуст.")
 
 
-    logger.info(f"Found {len(kline_df)} kline rows and {len(orderbook_df)} orderbook rows.")
+    logger.info(f"Found {len(kline_df) if kline_df is not None else 0} kline rows and {len(orderbook_df) if orderbook_df is not None else 0} orderbook rows.")
 
     # Времена
     kline_df["timestamp"] = pd.to_datetime(kline_df["timestamp"]).dt.floor("60s").dt.tz_localize(None)
@@ -144,7 +144,7 @@ async def prepare_backtest_data(
         merged.rename(columns={"timestamp_copy": "timestamp"}, inplace=True)
 
     # Логируем количество строк
-    logger.info(f"Kline rows: {len(kline_df)}, Orderbook rows: {len(orderbook_df)}, Merged rows: {len(merged)}")
+    logger.info(f"Kline rows: {len(kline_df) if kline_df is not None else 0}, Orderbook rows: {len(orderbook_df) if orderbook_df is not None else 0}, Merged rows: {len(merged)}")
 
     rename_columns = {
         "open": "Open",

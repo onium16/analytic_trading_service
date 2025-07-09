@@ -55,17 +55,13 @@ class EventPublisher:
             tasks = []
             for handler in self._subscribers[event_type]:
                 try:
-                    # Запускаем каждый обработчик как отдельную задачу asyncio.
-                    # Это гарантирует, что медленный обработчик не заблокирует
-                    # других обработчиков или основной цикл событий.
+
                     task = asyncio.create_task(handler(event))
                     tasks.append(task)
                     logger.debug(f"Задача для обработчика {handler.__name__} ({event_type.__name__}) создана.")
                 except Exception as e:
                     logger.error(f"Ошибка при создании задачи для обработчика {handler.__name__} на событие {event_type.__name__}: {e}", exc_info=True)
             
-            # Ждем завершения всех задач, но с return_exceptions=True,
-            # чтобы ошибки в отдельных обработчиках не приводили к падению всего паблишера.
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
                 for task in tasks:

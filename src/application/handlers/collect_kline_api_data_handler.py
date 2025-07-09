@@ -5,19 +5,18 @@ from typing import Any, Dict, Optional
 from application.commands.collect_kline_api_data import CollectKlineApiDataCommand
 from application.contracts import Handler
 from domain.utilits.interval import _validate_interval
-from infrastructure.adapters.bybit_api_client import BybitClient # Изменен импорт
+from infrastructure.adapters.bybit_api_client import BybitClient 
 from infrastructure.config.settings import settings
 from infrastructure.logging_config import setup_logger
-from application.services.event_publisher import EventPublisher # Импорт EventPublisher
-from domain.events.data_events import KlineDataReceivedEvent # Импорт события
+from application.services.event_publisher import EventPublisher
+from domain.events.data_events import KlineDataReceivedEvent 
 
 logger = setup_logger(__name__)
 
 
-def _interval_to_number(interval: str) -> str: # Возвращаем str, как в вашей схеме KlineRecord
+def _interval_to_number(interval: str) -> str:
     """Converts interval like '1' to '1' or 'D' to 'D'."""
-    # Bybit API expects "1", "60", "D" etc., which are strings.
-    # So, we return string representation.
+
     return str(interval)
 
 
@@ -30,7 +29,7 @@ def _get_interval_duration_seconds(interval: str) -> int:
         elif interval_upper == "W":
             return 7 * 24 * 60 * 60
         elif interval_upper == "M":
-            return 30 * 24 * 60 * 60 # Приближенно
+            return 30 * 24 * 60 * 60 
     try:
         return int(interval) * 60 # For numerical intervals like "1", "5", "60" etc.
     except ValueError:
@@ -38,7 +37,7 @@ def _get_interval_duration_seconds(interval: str) -> int:
         return 60
 
 
-class CollectKlineApiDataHandler(Handler): # Убрали Handler, если это не базовый класс
+class CollectKlineApiDataHandler(Handler): 
     def __init__(self, session: aiohttp.ClientSession, event_publisher: EventPublisher):
         self.session = session
         self.event_publisher = event_publisher
@@ -71,30 +70,14 @@ class CollectKlineApiDataHandler(Handler): # Убрали Handler, если эт
                     logger.debug("Нет новых данных в ответе API для свечей.")
                     continue
 
-                # Bybit возвращает свечи в обратном порядке (самые новые первыми)
-                # Берем самую старую (первую в отсортированном по времени списке) свечу из двух полученных,
-                # чтобы убедиться, что она закрыта.
-                # Свеча [0] - самая новая (текущая незавершенная), [1] - предыдущая (завершенная).
-                # Мы интересуемся ЗАВЕРШЕННЫМИ свечами.
-                
-                # result_list[0] - последняя свеча (скорее всего, незавершенная)
-                # result_list[1] - предпоследняя свеча (скорее всего, завершенная)
-                
-                # Проходим по списку, чтобы убедиться, что берем завершенную свечу
                 processed_kline_data: Optional[Dict[str, Any]] = None
                 
-                # Bybit API docs usually say list[0] is most recent, list[1] is previous, etc.
-                # If you request limit=2, list[1] is the one that just closed (or closed an interval ago).
+
                 if len(result_list) >= 2:
-                    kline = result_list[1] # Consider the second-to-last kline as the "closed" one
+                    kline = result_list[1] 
 
                     current_ts = int(kline[0]) # Timestamp of the kline close/open (depends on API)
-                    
-                    # Проверка на дубликаты и "незакрытость"
-                    # Если Bybit возвращает свечу с timestamp 'T' и интервалом '1m',
-                    # то она "закрылась" в T + 1m - 1ms.
-                    # Для простоты, мы будем считать, что kline[1] - это уже закрытая свеча
-                    # (если она не дубликат).
+              
                     if last_timestamp is not None and current_ts <= last_timestamp:
                         logger.debug(f"Пропущена дублирующая свеча: timestamp={current_ts}")
                         continue
@@ -126,5 +109,3 @@ class CollectKlineApiDataHandler(Handler): # Убрали Handler, если эт
             logger.error(f"Ошибка при получении/обработке данных свечей: {e}", exc_info=True)
 
         logger.info(f"Завершён цикл сбора свечей для {command.symbol}.")
-
-    # close метод больше не нужен, сессия управляется в main

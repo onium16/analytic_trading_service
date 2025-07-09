@@ -84,7 +84,7 @@ class BacktestRunner:
             return [self._process_single_value(item) for item in value]
         return value
 
-    def create_param_config(self, param_value: Any, param_type: str = None) -> Dict[str, Any]:
+    def create_param_config(self, param_value: Any, param_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Преобразует значение параметра в конфигурацию формата {'type': str, 'values': list}.
         Эта функция теперь также обрабатывает типы NumPy на входе и предназначена
