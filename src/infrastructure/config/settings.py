@@ -7,10 +7,10 @@ from pydantic import Field as PydanticField, computed_field
 from asynch import Connection 
 
 class ClickHouseSettings(BaseSettings):
-    host: str
-    port_tcp: int
-    port_http: int
-    login: str
+    host: str = "localhost"
+    port_tcp: int = 9000
+    port_http: int = 8123
+    login: str = "default"
     password: str = ""
     
     db_name: str 
@@ -55,20 +55,20 @@ class ClickHouseSettings(BaseSettings):
     )
 
 class BybitSettings(BaseSettings):
-    name: str = "binance"
-    api_key: str
-    api_secret: str
-    base_url: str
-    ws_url: str
-    kline_url: str 
-    orderbook_url: str 
+    name: str = "bybit"
+    api_key: str = ""
+    api_secret: str = ""
+    base_url: str = ""
+    ws_url: str = ""
+    kline_url: str = ""
+    orderbook_url: str = ""
 
-    test_api_key: str
-    test_api_secret: str
-    test_base_url: str
-    test_ws_url: str
-    test_kline_url: str 
-    test_orderbook_url: str 
+    test_api_key: str = ""
+    test_api_secret: str = ""
+    test_base_url: str = ""
+    test_ws_url: str = ""
+    test_kline_url: str = ""
+    test_orderbook_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -78,15 +78,15 @@ class BybitSettings(BaseSettings):
 
 class BinanceSettings(BaseSettings):
     name: str = "binance"
-    api_key: str
-    api_secret: str
-    base_url: str
-    kline_url: str 
+    api_key: str = ""
+    api_secret: str = ""
+    base_url: str = ""
+    kline_url: str = ""
 
-    test_api_key: str
-    test_api_secret: str
-    test_base_url: str
-    test_kline_url: str
+    test_api_key: str = ""
+    test_api_secret: str = ""
+    test_base_url: str = ""
+    test_kline_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -128,9 +128,9 @@ class BacktestingSettings(BaseSettings):
 
 class StreamSettings(BaseSettings):
     name: str = "stream"
-    snapshots_count: int
-    snapshots_interval_sec: int
-    snapshots_orderbook_depth: int
+    snapshots_count: int = 10
+    snapshots_interval_sec: int = 60
+    snapshots_orderbook_depth: int = 20
     duration: int = 120
     
     model_config = SettingsConfigDict(
@@ -172,10 +172,25 @@ class OrderbookSettings(BaseSettings):
 class Settings(BaseSettings):
     logger_level: str = PydanticField(default="INFO") 
 
-    clickhouse: ClickHouseSettings = PydanticField(default_factory=lambda: ClickHouseSettings())
+    clickhouse: ClickHouseSettings = PydanticField(default_factory=lambda: ClickHouseSettings(db_name="default"))
     bybit: BybitSettings = PydanticField(default_factory=lambda: BybitSettings())
-    binance: BinanceSettings = PydanticField(default_factory=lambda: BinanceSettings())
-    backtesting: BacktestingSettings = PydanticField(default_factory=lambda: BacktestingSettings())
+    binance: BinanceSettings = PydanticField(default_factory=lambda: BinanceSettings(
+        api_key="",
+        api_secret="",
+        base_url="",
+        kline_url="",
+        test_api_key="",
+        test_api_secret="",
+        test_base_url="",
+        test_kline_url=""
+    ))
+    backtesting: BacktestingSettings = PydanticField(
+        default_factory=lambda: BacktestingSettings(
+            default_file_settings="default_strategy_settings.json",
+            best_file_settings="best_strategy_settings.json",
+            custom_file_settings="custom_strategy_settings.json"
+        )
+    )
     streaming: StreamSettings = PydanticField(default_factory=lambda: StreamSettings())
     kline: KlineSettings = PydanticField(default_factory=lambda: KlineSettings())
     orderbook: OrderbookSettings = PydanticField(default_factory=lambda: OrderbookSettings())
@@ -213,4 +228,4 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+settings = Settings(testnet=False)
