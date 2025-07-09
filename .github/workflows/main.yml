@@ -146,7 +146,7 @@ jobs:
         for i in {1..30}; do
           echo "SELECT 1;" | clickhouse-client --host localhost --port 9000 --user default --password password && break
           echo "Waiting for ClickHouse..."
-          sleep 2
+          sleep 5
         done
 
     - name: Install dependencies

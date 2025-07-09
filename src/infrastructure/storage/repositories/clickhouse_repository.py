@@ -1,7 +1,7 @@
 # src/infrastructure/storage/repositories/clickhouse_repository.py
 
 import asyncio
-from typing import List, Type, TypeVar, Generic, Union, get_origin, get_args
+from typing import List, Type, TypeVar, Generic, Union, Optional, get_origin, get_args
 from decimal import Decimal
 from datetime import datetime
 import json
@@ -45,7 +45,19 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
     async def database_exists(self) -> bool:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, lambda: self.client.command(f"EXISTS DATABASE {self.db}"))
-        return bool(int(result))
+        # Handle possible return types: int, str, or QuerySummary
+        if isinstance(result, int):
+            return bool(result)
+        elif isinstance(result, str):
+            return bool(int(result))
+        elif hasattr(result, 'result_rows'):
+            # QuerySummary: extract first value if possible
+            rows = getattr(result, 'result_rows', [])
+            if rows and rows[0]:
+                return bool(int(rows[0][0]))
+            return False
+        else:
+            raise TypeError(f"Unexpected result type from client.command: {type(result)}")
 
     async def create_database(self) -> None:
         loop = asyncio.get_running_loop()
@@ -195,7 +207,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         rows = self.client.query(f"SELECT * FROM {self.db}.{self.table_name}").result_rows
         return [self._deserialize_row(dict(zip(self.schema.model_fields.keys(), row))) for row in rows]
 
-    async def fetch_dataframe(self, query: str, params: dict = None) -> pd.DataFrame:
+    async def fetch_dataframe(self, query: str, params: Optional[dict] = None) -> pd.DataFrame:
         result = self.client.query(query)  # тут result — сразу list строк, у него нет column_names
         columns = result.column_names  # Ошибка: result — это list, у него нет column_names
         rows = list(result.result_rows)  # Ошибка: result — list, нет .result_rows
