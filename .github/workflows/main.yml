@@ -14,8 +14,8 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:latest
         ports: 
-          - 18123:8123 
-          - 19000:9000 
+          - 8123:8123 
+          - 9000:9000 
         env:
           CLICKHOUSE_HOST: clickhouse 
           CLICKHOUSE_USER: default
@@ -56,7 +56,7 @@ jobs:
 
       # ClickHouse connection (для clickhouse-client и Pydantic)
       CLICKHOUSE_HOST: localhost
-      CLICKHOUSE_PORT: 18123
+      CLICKHOUSE_PORT: 8123
       CLICKHOUSE_USER: default
       CLICKHOUSE_LOGIN: default
       CLICKHOUSE_PASSWORD: password
@@ -143,7 +143,7 @@ jobs:
 
     - name: Check if required ports are in use
       run: |
-        for port in 8123 9000 18123 19000; do
+        for port in 8123 9000 8123 9000; do
           echo "Checking if port $port is in use:"
           if sudo lsof -i :$port; then
             echo "❌ Port $port is already in use!"
@@ -175,7 +175,7 @@ jobs:
         # Используем localhost и проброшенный порт 9000 для подключения
         # Пароль пустой, как указано в .env
         for i in {1..30}; do
-          echo "SELECT 1;" | clickhouse-client --host localhost --port 19000 --user default --password password && break
+          echo "SELECT 1;" | clickhouse-client --host localhost --port 9000 --user default --password password && break
           echo "Waiting for ClickHouse..."
           sleep 5
         done
