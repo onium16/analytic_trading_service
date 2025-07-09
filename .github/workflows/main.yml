@@ -1,0 +1,71 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8123:8123
+          - 9000:9000
+        options: >-
+          --health-cmd="curl -sSf http://localhost:8123/ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      CLICKHOUSE_HOST: localhost
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Wait for ClickHouse to be ready
+      run: |
+        for i in {1..30}; do
+          curl -sSf http://localhost:8123/ping && break
+          echo "Waiting for ClickHouse..."
+          sleep 2
+        done
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install .[testing]
+        pip install black mypy
+
+    - name: Run black formatting check
+      run: |
+        black . --check
+
+    - name: Run mypy type checks
+      run: |
+        mypy src/
+
+    - name: Run pytest and generate report
+      run: |
+        pytest --junitxml=pytest-report.xml
+
+    - name: Upload test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-report
+        path: pytest-report.xml
