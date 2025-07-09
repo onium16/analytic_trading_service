@@ -18,7 +18,7 @@ jobs:
           - 9000:9000 
         env:
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: password
+          CLICKHOUSE_PASSWORD: ""
           CLICKHOUSE_PORT_HTTP: 8123 
           CLICKHOUSE_PORT_TCP: 9000 
           CLICKHOUSE_LOGIN: default 
@@ -55,10 +55,10 @@ jobs:
 
       # ClickHouse connection (для clickhouse-client и Pydantic)
       CLICKHOUSE_HOST: localhost
-      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_PORT: 8123
       CLICKHOUSE_USER: default
       CLICKHOUSE_LOGIN: default
-      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_PASSWORD:  ""
 
       # ClickHouse DB settings (для Pydantic)
       CLICKHOUSE_DB_NAME: oraculv2
@@ -106,7 +106,6 @@ jobs:
       SETTINGS_START_TIME: 2025-06-20
       SETTINGS_END_TIME: 2025-06-21
 
-      PYTHONPATH: . # Добавляем текущую директорию в PYTHONPATH
 
     steps:
     - name: Checkout repo
@@ -144,7 +143,7 @@ jobs:
         # Используем localhost и проброшенный TCP порт 9000 для подключения
         # Пароль пустой, как указано в .env
         for i in {1..30}; do
-          echo "SELECT 1;" | clickhouse-client --host localhost --port 9000 --user default --password password && break
+          echo "SELECT 1;" | clickhouse-client --host localhost --port 8123 --user default --password "" && break
           echo "Waiting for ClickHouse..."
           sleep 5
         done
