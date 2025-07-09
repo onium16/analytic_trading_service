@@ -35,7 +35,6 @@ datasets2/
 # Local environment / config
 .env
 bin
-build
 
 # Metadata and preprocessed configs
 metadata/

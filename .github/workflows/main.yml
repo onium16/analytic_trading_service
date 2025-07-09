@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, ci-setup ]
   pull_request:
     branches: [ main, master ]
 
@@ -14,8 +14,8 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:latest
         ports: 
-          - 18123:8123 
-          - 19000:9000 
+          - 8123:8123 
+          - 9000:9000 
         env:
           CLICKHOUSE_USER: default
           CLICKHOUSE_PASSWORD: password 
@@ -27,7 +27,7 @@ jobs:
 
     env:
       CLICKHOUSE_HOST: localhost 
-      CLICKHOUSE_PORT: 19000 
+      CLICKHOUSE_PORT: 9000 
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: password 
 
@@ -64,9 +64,9 @@ jobs:
 
     - name: Wait for ClickHouse to be ready
       run: |
-        # Используем localhost и проброшенный TCP порт 19000 для подключения
+        # Используем localhost и проброшенный TCP порт 9000 для подключения
         for i in {1..30}; do
-          echo "SELECT 1;" | clickhouse-client --host localhost --port 19000 --user default --password password && break
+          echo "SELECT 1;" | clickhouse-client --host localhost --port 9000 --user default --password password && break
           echo "Waiting for ClickHouse..."
           sleep 2
         done
