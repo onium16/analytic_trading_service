@@ -1,125 +1,168 @@
-from datetime import datetime
-from infrastructure.storage.repositories.storage_initializer import StorageInitializer
-import pytest
+# tests/application/services/test_data_pipeline_service.py
 import asyncio
-import aiohttp
-from unittest.mock import AsyncMock, patch, MagicMock
-from main import run_stream_application, initialisation_storage # Импорт основных функций
-from application.services.event_publisher import EventPublisher
-from application.stream_strategy_processor import StreamStrategyProcessor
-from application.trade_processor import TradingProcessor
+import pytest
+import pandas as pd
+from unittest.mock import AsyncMock, MagicMock, patch
+from collections import deque
+from datetime import datetime
+
 from application.services.data_pipeline_service import DataPipelineService
-from domain.events.data_events import KlineDataReceivedWsEvent, OrderbookSnapshotReceivedWsEvent
+from domain.events.data_events import (
+    KlineDataReceivedEvent,
+    OrderbookSnapshotReceivedEvent,
+    KlineDataReceivedWsEvent,
+    OrderbookSnapshotReceivedWsEvent,
+)
+from infrastructure.storage.schemas import KlineRecord, OrderbookSnapshotModel
 from infrastructure.config.settings import settings
-from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
-from infrastructure.storage.schemas import KlineRecord, OrderbookSnapshotModel, TradeSignal, TradeResult
 
-# Фикстура для настройки ClickHouse для этого теста
-@pytest.fixture(scope="module")
-async def setup_clickhouse_for_full_pipeline():
-    test_db_name = f"test_full_pipeline_db_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    
-    # Save original settings
-    original_db_name = settings.clickhouse.db_name
-    original_kline_table = settings.clickhouse.table_kline_archive
-    original_snapshots_table = settings.clickhouse.table_orderbook_snapshots
-    original_trade_signals_table = settings.clickhouse.table_trade_signals
-    original_trade_results_table = settings.clickhouse.table_trade_results
-
-    # Set test settings
-    settings.clickhouse.db_name = test_db_name
-    settings.clickhouse.table_kline_archive = "kline_full_pipeline"
-    settings.clickhouse.table_orderbook_snapshots = "orderbook_full_pipeline"
-    settings.clickhouse.table_trade_signals = "trade_signals_full_pipeline"
-    settings.clickhouse.table_trade_results = "trade_results_full_pipeline"
-
-    client = await settings.clickhouse.connect()
-    initializer = StorageInitializer(settings, MagicMock(), client)
-    
-    try:
-        await initializer.create_database(test_db_name)
-        await initializer.initialize([
-            (KlineRecord, settings.clickhouse.table_kline_archive),
-            (OrderbookSnapshotModel, settings.clickhouse.table_orderbook_snapshots),
-            (TradeSignal, settings.clickhouse.table_trade_signals),
-            (TradeResult, settings.clickhouse.table_trade_results),
-        ])
-        yield  # Run tests
-    finally:
-        await client.execute(f"DROP DATABASE IF EXISTS {test_db_name}")
-        await client.close()
-        # Restore original settings
-        settings.clickhouse.db_name = original_db_name
-        settings.clickhouse.table_kline_archive = original_kline_table
-        settings.clickhouse.table_orderbook_snapshots = original_snapshots_table
-        settings.clickhouse.table_trade_signals = original_trade_signals_table
-        settings.clickhouse.table_trade_results = original_trade_results_table
-
-# Мок для WebSocket соединения
+# Подготавливаем фикстуры и моки для тестов
 @pytest.fixture
-async def mock_ws_connection():
-    ws = AsyncMock()
-    ws.receive_json.side_effect = [
-        {"op": "pong"},
-        {"data": [{"k": {"s": "ETHUSDT", "t": 1720000000000, "o": "2000", "h": "2010", "l": "1990", "c": "2005", "v": "100"}}], "topic": "kline.1.ETHUSDT", "type": "snapshot"},
-        {"data": {"s": "ETHUSDT", "b": [["2000.0", "50.0"]], "a": [["2001.0", "60.0"]]}, "topic": "orderbook.1.ETHUSDT", "type": "snapshot"},
-        asyncio.CancelledError # Останавливаем поток после получения тестовых данных
-    ]
-    yield ws
+def mock_trade_processor():
+    return AsyncMock()
 
 @pytest.fixture
-async def mock_aiohttp_session(mock_ws_connection):
-    session = AsyncMock(spec=aiohttp.ClientSession)
-    session.ws_connect.return_value.__aenter__.return_value = mock_ws_connection
-    yield session
+def mock_stream_strategy_processor():
+    return AsyncMock()
+
+@pytest.fixture
+def mock_clickhouse_repository():
+    repo = AsyncMock()
+    repo.ensure_table = AsyncMock()
+    repo.update = AsyncMock()
+    return repo
+
+@pytest.fixture
+def mock_delta_analyzer():
+    analyzer = MagicMock()
+    analyzer.archive_analyze = MagicMock(return_value=pd.DataFrame([{
+        's': 'BTCUSDT', 'ts': 1697059200000, 'u': 1, 'seq': 1, 'cts': 1697059200000,
+        'uuid': 123, 'num_bids': 10, 'num_asks': 10
+    }]))
+    return analyzer
+
+@pytest.fixture
+def mock_prepare_backtest_data():
+    with patch('application.services.data_pipeline_service.prepare_backtest_data') as mock:
+        mock.return_value = pd.DataFrame([{
+            'timestamp': pd.to_datetime(1697059200000, unit='ms'),
+            'symbol': 'BTCUSDT',
+            'close': 28000.0
+        }])
+        yield mock
+
+@pytest.fixture
+def data_pipeline_service(mock_trade_processor, mock_stream_strategy_processor, mock_clickhouse_repository, mock_delta_analyzer):
+    # Патчим ClickHouseRepository, чтобы возвращать замоканный репозиторий
+    with patch('application.services.data_pipeline_service.ClickHouseRepository', return_value=mock_clickhouse_repository):
+        # Патчим DeltaAnalyzerArchive
+        with patch('application.services.data_pipeline_service.DeltaAnalyzerArchive', return_value=mock_delta_analyzer):
+            service = DataPipelineService(
+                trade_processor=mock_trade_processor,
+                stream_strategy_processor=mock_stream_strategy_processor
+            )
+            # Устанавливаем тестовые значения для настроек
+            settings.kline.db_batch_size = 2
+            settings.kline.db_batch_timer = 5
+            settings.orderbook.db_batch_size = 2
+            settings.orderbook.db_batch_timer = 5
+            settings.kline.count_candles = 2
+            return service
 
 @pytest.mark.asyncio
-async def test_full_stream_pipeline_integration(setup_clickhouse_for_full_pipeline, mock_aiohttp_session):
-    # Мокируем зависимости, которые не хотим тестировать в этом интеграционном тесте,
-    # но которые вызываются в run_stream_application
-    with patch('application.stream_strategy_processor.StreamStrategyProcessor.process_data', AsyncMock()) as mock_process_strategy_data, \
-         patch('application.trade_processor.TradingProcessor.process_trade', AsyncMock()) as mock_process_trade:
+async def test_initialize(data_pipeline_service, mock_clickhouse_repository):
+    """Тестируем метод initialize."""
+    await data_pipeline_service.initialize()
+    
+    # Проверяем, что таблицы созданы
+    assert mock_clickhouse_repository.ensure_table.call_count == 2
+    # Проверяем, что фоновые задачи созданы
+    assert data_pipeline_service.kline_save_task is not None
+    assert data_pipeline_service.orderbook_save_task is not None
 
-        # Настраиваем длительность потока на короткий срок, чтобы тест завершился
-        original_duration = settings.streaming.duration
-        settings.streaming.duration = 1 # Сек.
+@pytest.mark.asyncio
+async def test_handle_kline_data(data_pipeline_service):
+    """Тестируем обработку события KlineDataReceivedEvent."""
+    kline_data = {
+        'symbol': 'BTCUSDT',
+        'timestamp': 1697059200000,
+        'interval': '1m',
+        'open': 27000.0,
+        'close': 28000.0,
+        'high': 28500.0,
+        'low': 26500.0,
+        'volume': 100.0
+    }
+    event = KlineDataReceivedEvent(kline_data=kline_data)
+    
+    await data_pipeline_service.handle_kline_data(event)
+    
+    # Проверяем, что данные добавлены в буфер
+    assert 'BTCUSDT' in data_pipeline_service.kline_buffer
+    assert len(data_pipeline_service.kline_buffer['BTCUSDT']) == 1
+    assert data_pipeline_service.kline_buffer['BTCUSDT'][0] == kline_data
+    
+    # Проверяем, что данные добавлены в батч для БД
+    assert 'BTCUSDT' in data_pipeline_service.kline_current_batch_db
+    assert len(data_pipeline_service.kline_current_batch_db['BTCUSDT']) == 1
+
+@pytest.mark.asyncio
+async def test_handle_orderbook_snapshot(data_pipeline_service):
+    """Тестируем обработку события OrderbookSnapshotReceivedEvent."""
+    orderbook_data = {
+        'symbol': 'BTCUSDT',
+        'ts': 1697059200000,
+        'bids': [[27000.0, 1.0]],
+        'asks': [[28000.0, 1.0]]
+    }
+    event = OrderbookSnapshotReceivedEvent(orderbook_data=orderbook_data)
+    
+    await data_pipeline_service.handle_orderbook_snapshot(event)
+    
+    # Проверяем, что данные добавлены в батч ордербуков
+    assert 'BTCUSDT' in data_pipeline_service.orderbook_current_batch
+    assert len(data_pipeline_service.orderbook_current_batch['BTCUSDT']) == 1
+    assert data_pipeline_service.orderbook_current_batch['BTCUSDT'][0] == orderbook_data
+
+
+@pytest.mark.asyncio
+async def test_process_combined_data(data_pipeline_service, mock_prepare_backtest_data):
+    """Тестируем обработку комбинированных данных."""
+    symbol = 'BTCUSDT'
+    kline_data = {
+        'symbol': symbol,
+        'timestamp': 1697059200000,
+        'interval': '1m',
+        'open': 27000.0,
+        'close': 28000.0,
+        'high': 28500.0,
+        'low': 26500.0,
+        'volume': 100.0
+    }
+    orderbook_data = {
+        's': symbol,
+        'ts': 1697059200000,
+        'bids': [[27000.0, 1.0]],
+        'asks': [[28000.0, 1.0]]
+    }
+    
+    # Наполняем буферы
+    data_pipeline_service.kline_buffer[symbol] = [kline_data, kline_data]
+    data_pipeline_service.orderbook_buffer_for_strategy[symbol] = [orderbook_data]
+    
+    # Мокаем StrategyManager.run_all
+    with patch.object(data_pipeline_service.strategy_manager, 'run_all', new=AsyncMock(return_value={'signal': 'buy'})) as mock_run_all:
+        await data_pipeline_service._process_combined_data(symbol)
         
-        try:
-            # Запускаем основное приложение в режиме STREAM_MODE с WebSocket
-            # initialisation_storage уже выполнена в setup_clickhouse_for_full_pipeline
-            await run_stream_application(use_ws=True)
-        finally:
-            settings.streaming.duration = original_duration # Восстанавливаем настройки
-
-        # Проверяем, что Kline и Orderbook данные были получены и обработаны
-        # (Проверяем через мокирование ws_connection и event_publisher)
-        mock_aiohttp_session.ws_connect.assert_called_once()
+        # Проверяем, что prepare_backtest_data вызван
+        mock_prepare_backtest_data.assert_called_once()
         
-        # Проверяем, что StreamStrategyProcessor и TradingProcessor были вызваны
-        # (Это указывает на то, что данные прошли через пайплайн)
-        assert mock_process_strategy_data.called
-        assert mock_process_trade.called
-
-        # Проверяем, что данные были сохранены в ClickHouse
-        kline_repo = ClickHouseRepository(KlineRecord, settings.clickhouse.db_name, settings.clickhouse.table_kline_archive)
-        orderbook_repo = ClickHouseRepository(OrderbookSnapshotModel, settings.clickhouse.db_name, settings.clickhouse.table_orderbook_snapshots)
-        trade_signal_repo = ClickHouseRepository(TradeSignal, settings.clickhouse.db_name, settings.clickhouse.table_trade_signals)
-        trade_result_repo = ClickHouseRepository(TradeResult, settings.clickhouse.db_name, settings.clickhouse.table_trade_results)
-
-        # Обратите внимание: DataPipelineService сохраняет данные в БД.
-        # Мокируем сохранение на уровне репозитория, если не хотим зависеть от ClickHouse здесь.
-        # Для *интеграционного* теста мы хотим проверить реальное сохранение.
-        # Поэтому, проверяем, что данные *есть* в БД после запуска.
-
-        # DataPipelineService сохраняет Klines и Orderbooks
-        saved_klines = await kline_repo.get_all()
-        saved_orderbooks = await orderbook_repo.get_all()
+        # Проверяем, что стратегия вызвана
+        mock_run_all.assert_called_once()
         
-        assert len(saved_klines) >= 1
-        assert len(saved_orderbooks) >= 1
+        # Проверяем, что торговый процессор получил сигнал
+        data_pipeline_service.trade_processor.process_signal.assert_called_once_with({'signal': 'buy'})
         
-        # Если стратегии генерируют сигналы и результаты, их также можно проверить:
-        # saved_signals = await trade_signal_repo.get_all()
-        # saved_results = await trade_result_repo.get_all()
-        # assert len(saved_signals) >= 1 # Если ожидается генерация сигналов
-        # assert len(saved_results) >= 1 # Если ожидается совершение сделок
+        # Проверяем, что буферы очищены
+        assert len(data_pipeline_service.kline_buffer[symbol]) == 0
+        assert len(data_pipeline_service.orderbook_buffer_for_strategy[symbol]) == 0

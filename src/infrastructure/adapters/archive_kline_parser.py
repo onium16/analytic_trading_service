@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import re
 import json
+from zoneinfo import ZoneInfo
 import requests
 import time
 import pandas as pd
@@ -155,40 +156,35 @@ class KlineParser:
         - DD-MM-YYYY
         - Unix timestamp (в секундах или миллисекундах)
         """
-        return (
-            re.match(r"^\d{4}-\d{2}-\d{2}$", date_str) or
-            re.match(r"^\d{2}-\d{2}-\d{4}$", date_str) or
-            re.match(r"^\d{10,13}$", date_str)  # timestamp (10 или 13 цифр)
-        )
+        # Example regex for 'YYYY-MM-DD'
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_str):
+            return True # Or it might be returning the match object directly
+        # Example regex for 'DD-MM-YYYY'
+        if re.fullmatch(r'\d{2}-\d{2}-\d{4}', date_str):
+            return True
+        # Example regex for Unix timestamp (10 or 13 digits)
+        if re.fullmatch(r'\d{10}|\d{13}', date_str):
+            return True
+        return False
 
 
     def parse_date(self, date_str: str) -> datetime:
         """
-        Преобразует строку даты в datetime.
-        Возвращает НАИВНЫЙ datetime объект, представляющий время UTC.
-        Поддерживает форматы:
-        - 'YYYY-MM-DD'
-        - 'DD-MM-YYYY'
-        - Unix timestamp (в секундах или миллисекундах)
+        Парсинг строки даты в datetime.
+        Поддерживаемые форматы: YYYY-MM-DD, DD-MM-YYYY, Unix timestamp (в секундах или миллисекундах)
         """
-        result_dt: datetime 
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
-            result_dt = datetime.strptime(date_str, "%Y-%m-%d")
+        utc_zone = ZoneInfo("UTC")
 
-        elif re.match(r"^\d{2}-\d{2}-\d{4}$", date_str):
-            result_dt = datetime.strptime(date_str, "%d-%m-%Y")
-
-        elif re.match(r"^\d{10,13}$", date_str):
-            timestamp_val = int(date_str)
-            if len(date_str) == 13: # миллисекунды
-                timestamp_val = float(timestamp_val) / 1000.0 # Используем float для точности
-            
-            result_dt = datetime.fromtimestamp(timestamp_val, tz=timezone.utc).replace(tzinfo=None)
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_str):
+            return datetime.strptime(date_str, '%Y-%m-%d')
+        elif re.fullmatch(r'\d{2}-\d{2}-\d{4}', date_str):
+            return datetime.strptime(date_str, '%d-%m-%Y')
+        elif re.fullmatch(r'\d{10}', date_str): # Таймстамп в секундах (например, 1735689500)
+            return datetime.fromtimestamp(int(date_str), tz=utc_zone).replace(tzinfo=None)
+        elif re.fullmatch(r'\d{13}', date_str): # Таймстамп в миллисекундах (например, 1735689500000)
+            return datetime.fromtimestamp(int(date_str) / 1000, tz=utc_zone).replace(tzinfo=None)
         else:
-            raise ValueError(f"Неподдерживаемый формат даты: {date_str}")
-        
-        logger.info(f"Парсинг даты: {date_str} -> Результат: {result_dt}")
-        return result_dt
+            raise ValueError(f"Unsupported date format: {date_str}")
 
 
     async def fetch_and_save_day(self, date: datetime) -> None:

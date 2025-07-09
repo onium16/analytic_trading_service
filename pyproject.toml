@@ -29,8 +29,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Для тестирования
+# testing 
 testing = [
     "pytest==8.4.1",         
     "pytest-asyncio==1.0.0"
+    "requests_mock==1.12.1"
 ]

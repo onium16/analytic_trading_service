@@ -1,3 +1,5 @@
+# src/infrastructure/adapters/bybit_ws_client.py
+
 import websockets
 import json
 from infrastructure.config.settings import settings

@@ -41,7 +41,7 @@ metadata_dropped/
 preprocessed_configs/
 
 # Reports / outputs / plots / archives
-# reports/
+reports/
 # *.png
 # *.jpg
 # *.jpeg
@@ -55,3 +55,6 @@ preprocessed_configs/
 
 # Optional if you use ClickHouse schema dumps
 *.sql
+
+# Example
+!./reports/1751971174

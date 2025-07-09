@@ -34,12 +34,15 @@
 
 ```
 .
-├── datasets/
 ├── pyproject.toml
 ├── README.MD
-├── reports/
 ├── SCHEMA_MODES_FLOW.jpg (схема режимов и потоков сервиса)
+├── datasets/
+├── reports/
 └── src/
+    ├── test/
+    │   ├── unit/
+    │   └── integration/
     ├── application/
     │   ├── commands/
     │   ├── handlers/
@@ -132,10 +135,10 @@
 Проект включает в себя инструменты для генерации отчетов и визуализации результатов:
 
   * **Отчеты по производительности:** Автоматически генерируются HTML-дашборды и CSV-файлы, содержащие ключевые метрики и графики.
-      * Пример отчета (HTML): [reports/1751971174/output-single\_large\_dashboard-20250708-124439.html](report/1751971174/output-single_large_dashboard-20250708-124439.html)
+      * Пример отчета (HTML): [./reports/1751971174/output-single\_large\_dashboard-20250708-124439.html](./reports/1751971174/output-single_large_dashboard-20250708-124439.html)
       ![Multibacktest.png](Multibacktest.png)
 
-      * Пример данных (CSV): [report/1751971174/strategy_performance_ETHUSDT_2025-06-20_2025-06-21.csv](report/1751971174/strategy_performance_ETHUSDT_2025-06-20_2025-06-21.csv)
+      * Пример данных (CSV): [./reports/report/1751971174/strategy_performance_ETHUSDT_2025-06-20_2025-06-21.csv](./reports/1751971174/strategy_performance_ETHUSDT_2025-06-20_2025-06-21.csv)
       
   * **Схема сервиса:** Визуальное представление архитектуры и потока данных:
       * ![SCHEMA\_MODES\_FLOW.jpg](SCHEMA_MODES_FLOW.jpg)
@@ -169,87 +172,26 @@ pip install --upgrade .
 touch .env
 ```
 
-Пример содержимого файла `.env`:
+Пример содержимого файла `.env` (копия из `.env.example`):
 
 ```
 #.env
 
 # General settings
 LOGGER_LEVEL=DEBUG
-
-# Bybit keys
-BYBIT_API_KEY=
-BYBIT_API_SECRET=
-BYBIT_BASE_URL=https://api.bybit.com
-BYBIT_KLINE_URL=https://api.bybit.com/v5/market/kline
-BYBIT_ORDERBOOK_URL=https://api.bybit.com/v5/market/orderbook
-BYBIT_WS_URL=wss://stream.bybit.com/v5/public/linear
-
-BYBIT_TEST_API_KEY=None
-BYBIT_TEST_API_SECRET=None
-BYBIT_TEST_BASE_URL=https://api-testnet.bybit.com
-BYBIT_TEST_ORDERBOOK_URL=https://api-testnet.bybit.com/v5/market/orderbook
-BYBIT_TEST_KLINE_URL=https://api-testnet.bybit.com/v5/market/kline
-BYBIT_TEST_WS_URL=wss://stream-testnet.bybit.com/v5/public/linear
-
-# Binance keys
-BINANCE_API_KEY=
-BINANCE_API_SECRET=
-BINANCE_BASE_URL=https://api.binance.com
-BINANCE_KLINE_URL=https://api.binance.com/api/v3/klines
-
-BINANCE_TEST_API_KEY=None
-BINANCE_TEST_API_SECRET=None
-BINANCE_TEST_BASE_URL=https://testnet.binance.vision
-BINANCE_TEST_KLINE_URL=https://testnet.binance.vision/api/v3/klines
-
-# ClickHouse connection
-CLICKHOUSE_HOST=localhost
-CLICKHOUSE_PORT_TCP=9019
-CLICKHOUSE_PORT_HTTP=8123
-CLICKHOUSE_LOGIN=default
-CLICKHOUSE_PASSWORD=
-
-# ClickHouse DB settings
-CLICKHOUSE_DB_NAME=oraculv2
-
-# Tables names
-CLICKHOUSE_TABLE_KLINE_ARCHIVE=kline_archive
-CLICKHOUSE_TABLE_KLINE_ARCHIVE_DATETIME=kline_archive_datetime
-CLICKHOUSE_TABLE_ORDERBOOK_SNAPSHOTS=orderbook_archive_snapshots
-CLICKHOUSE_TABLE_ORDERBOOK_ARCHIVE_FILENAME=orderbook_archive_filename
-CLICKHOUSE_TABLE_TRADE_RESULTS=trade_results
-CLICKHOUSE_TABLE_TRADE_SIGNALS=trade_signals
-CLICKHOUSE_TABLE_POSITIONS=trade_positions
-
-# Tables names testnet 
-CLICKHOUSE_TABLE_KLINE_ARCHIVE_TESTNET=kline_archive_testnet
-CLICKHOUSE_TABLE_KLINE_ARCHIVE_DATETIME_TESTNET=kline_archive_datetime_testnet
-CLICKHOUSE_TABLE_ORDERBOOK_SNAPSHOTS_TESTNET=table_orderbook_snapshots_testnet
-CLICKHOUSE_TABLE_ORDERBOOK_ARCHIVE_FILENAME_TESTNET=orderbook_archive_filename_testnet
-CLICKHOUSE_TABLE_TRADE_RESULTS_TESTNET=orderbook_trade_testnet
-CLICKHOUSE_TABLE_POSITIONS_TESTNET=orderbook_positions_testnet
-
-# Backtesting files
-BACKTESTING_DEFAULT_FILE_SETTINGS=default_strategy_settings.json
-BACKTESTING_BEST_FILE_SETTINGS=best_strategy_settings.json
-BACKTESTING_CUSTOM_FILE_SETTINGS=custom_strategy_settings.json
-BACKTESTING_CASH=100000
-
-#Streaming settings
-TESTNET = True
-STREAM_SNAPSHOTS_COUNT=20
-STREAM_SNAPSHOTS_ORDERBOOK_DEPTH=200
-STREAM_SNAPSHOTS_INTERVAL_SEC=1
-STREAM_TIMER = 310
-STREAM_DURATION = 310
-
+...
 ```
 
 ### 4\. Запуск приложения
 
 ```bash
 python -m src.main
+```
+
+### 5\. Тестирование приложения
+
+```bash
+pytest src/  -v 
 ```
 
 -----

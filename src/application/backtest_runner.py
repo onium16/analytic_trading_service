@@ -43,8 +43,12 @@ class BacktestRunner:
         archive_mode (bool): Использовать ли архивные данные из базы.
         strategy_params (Optional[Dict[str, Any]]): Параметры для оптимизации стратегий.
     """
+    strategies_to_test: list = [
+            S_BidAcc, S_BidExh, S_BidWall, S_AskAcc, 
+            S_AskExh, S_ImbReversal, S_LiquidityTrap, S_AskAccumulationShort
+        ]
     def __init__(self, archive_mode: bool = False, stream_mode: bool = False, archive_source: bool = True, stream_source: bool = True,  strategy_params: Optional[Dict[str, Any]] = None):
-   
+        
         self.logger = logger
         self.PAIR_TOKENS: list = [settings.pair_tokens]
         self.DB_NAME: str = settings.clickhouse.db_name
@@ -58,10 +62,7 @@ class BacktestRunner:
         self.END_TIME: str = settings.end_time
         self.FOLDER_REPORT: str = settings.folder_report
         self.UNIQUE_ID = None
-        self.strategies_to_test: list = [
-            S_BidAcc, S_BidExh, S_BidWall, S_AskAcc, 
-            S_AskExh, S_ImbReversal, S_LiquidityTrap, S_AskAccumulationShort
-        ]
+
         strategy_params_custom = parse_strategy_params_from_file(bt_setttings.custom_path) 
         logger.debug(strategy_params_custom)
         self.strategy_params = strategy_params if strategy_params is not None else strategy_params_custom
@@ -433,7 +434,7 @@ class BacktestRunner:
 
             for pair in self.PAIR_TOKENS:
                 self.logger.info(f"\n--- Running backtest for pair: {pair} ---")
-                for strat_class in self.strategies_to_test:
+                for strat_class in BacktestRunner.strategies_to_test:
                     strat_name = strat_class.__name__
                     self.logger.info(f"\n--- Running Backtest for {strat_name} ---")
                     bt = Backtest(
