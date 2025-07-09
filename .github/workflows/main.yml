@@ -14,11 +14,12 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:latest
         ports: 
-          - 8123:8123 
-          - 9000:9000 
+          - 18123:8123 
+          - 19000:9000 
         env:
+          CLICKHOUSE_HOST: clickhouse 
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_PASSWORD: testpass
           CLICKHOUSE_PORT_HTTP: 8123 
           CLICKHOUSE_PORT_TCP: 9000 
           CLICKHOUSE_LOGIN: default 
@@ -55,10 +56,10 @@ jobs:
 
       # ClickHouse connection (для clickhouse-client и Pydantic)
       CLICKHOUSE_HOST: localhost
-      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_PORT: 18123
       CLICKHOUSE_USER: default
       CLICKHOUSE_LOGIN: default
-      CLICKHOUSE_PASSWORD:  ""
+      CLICKHOUSE_PASSWORD: testpass
 
       # ClickHouse DB settings (для Pydantic)
       CLICKHOUSE_DB_NAME: oraculv2
@@ -106,7 +107,6 @@ jobs:
       SETTINGS_START_TIME: 2025-06-20
       SETTINGS_END_TIME: 2025-06-21
 
-
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -138,12 +138,44 @@ jobs:
         # Устанавливаем clickhouse-client
         sudo apt-get install -y clickhouse-client
 
+    - name: Install lsof
+      run: sudo apt-get update && sudo apt-get install -y lsof
+
+    - name: Check if required ports are in use
+      run: |
+        for port in 8123 9000 18123 19000; do
+          echo "Checking if port $port is in use:"
+          if sudo lsof -i :$port; then
+            echo "❌ Port $port is already in use!"
+          else
+            echo "✅ Port $port is free"
+          fi
+          echo "------"
+        done
+
+        echo "🔍 Full list of listening ports:"
+        sudo lsof -i -P -n | grep LISTEN || echo "No listening ports found"
+
+    - name: Check ClickHouse Listening Ports
+      run: |
+        echo "🔍 Checking listening ports inside ClickHouse container"
+        docker ps
+        CONTAINER_ID=$(docker ps --filter "ancestor=clickhouse/clickhouse-server:latest" --format "{{.ID}}")
+        echo "📦 Container ID: $CONTAINER_ID"
+
+        echo "🛠 Installing net-tools (for netstat)"
+        docker exec $CONTAINER_ID bash -c "apt-get update && apt-get install -y net-tools"
+
+        echo "📡 Listening ports inside container:"
+        docker exec $CONTAINER_ID bash -c "netstat -tuln | grep LISTEN || echo '❌ No ports found listening'"
+
+
     - name: Wait for ClickHouse to be ready
       run: |
-        # Используем localhost и проброшенный TCP порт 9000 для подключения
+        # Используем localhost и проброшенный порт 9000 для подключения
         # Пароль пустой, как указано в .env
         for i in {1..30}; do
-          echo "SELECT 1;" | clickhouse-client --host localhost --port 8123 --user default --password "" && break
+          echo "SELECT 1;" | clickhouse-client --host localhost --port 19000 --user default --password password && break
           echo "Waiting for ClickHouse..."
           sleep 5
         done
