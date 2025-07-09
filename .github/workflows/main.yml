@@ -19,7 +19,7 @@ jobs:
         env:
           CLICKHOUSE_HOST: clickhouse 
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: testpass
+          CLICKHOUSE_PASSWORD: password
           CLICKHOUSE_PORT_HTTP: 8123 
           CLICKHOUSE_PORT_TCP: 9000 
           CLICKHOUSE_LOGIN: default 
@@ -59,7 +59,7 @@ jobs:
       CLICKHOUSE_PORT: 18123
       CLICKHOUSE_USER: default
       CLICKHOUSE_LOGIN: default
-      CLICKHOUSE_PASSWORD: testpass
+      CLICKHOUSE_PASSWORD: password
 
       # ClickHouse DB settings (для Pydantic)
       CLICKHOUSE_DB_NAME: oraculv2
