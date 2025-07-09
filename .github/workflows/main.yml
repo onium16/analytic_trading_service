@@ -13,16 +13,16 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:latest
-        ports: # Проброс портов для локального тестирования с act
-          - 18123:8123 # HTTP порт (хост:контейнер)
-          - 9000:9000 # TCP порт (хост:контейнер) - мапим 9000 на стандартный 9000
+        ports: 
+          - 8123:8123 
+          - 9000:9000 
         env:
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: password  # Пароль установлен на пустую строку, как в .env
-          CLICKHOUSE_DB_NAME: oraculv2 # Имя базы данных
-          CLICKHOUSE_PORT_HTTP: 8123 # HTTP порт ClickHouse
-          CLICKHOUSE_PORT_TCP: 9000 # TCP порт ClickHouse (внутри контейнера)
-          CLICKHOUSE_LOGIN: default # Логин для ClickHouse
+          CLICKHOUSE_PASSWORD: password  
+          CLICKHOUSE_DB_NAME: oraculv2 
+          CLICKHOUSE_PORT: 8123 
+          CLICKHOUSE_PORT_TCP: 9000 
+          CLICKHOUSE_LOGIN: default 
         options: >-
           --health-cmd="clickhouse-client --query 'SELECT 1'"
           --health-interval=10s
