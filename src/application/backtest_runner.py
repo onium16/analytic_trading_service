@@ -548,7 +548,7 @@ class BacktestRunner:
             results_df[dollar_columns] = results_df[dollar_columns].round(4)
 
             results_df.to_csv(f'{self.FOLDER_REPORT}/{self.UNIQUE_ID}/strategy_performance_{"_".join(self.PAIR_TOKENS)}_{self.START_TIME}_{self.END_TIME}.csv', index=False)
-            self.logger.info(f"\nResults saved to '{self.FOLDER_REPORT}/{self.UNIQUE_ID}/strategy_performance_{"_".join(self.PAIR_TOKENS)}_{self.START_TIME}_{self.END_TIME}.csv'")
+            self.logger.info(f'\nResults saved to "{self.FOLDER_REPORT}/{self.UNIQUE_ID}/strategy_performance_{"_".join(self.PAIR_TOKENS)}_{self.START_TIME}_{self.END_TIME}.csv"')
 
             best_strategy = results_df.loc[results_df['Return [%]'].idxmax()]
             self.logger.info(f"\nBest performing strategy: {best_strategy['Strategy']}")

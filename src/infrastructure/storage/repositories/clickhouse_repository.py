@@ -51,6 +51,21 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: self.client.command(f"CREATE DATABASE IF NOT EXISTS {self.db}"))
 
+    async def drop_database(self) -> None:
+        """
+        Drops the database specified in self.db if it exists.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.command(f"DROP DATABASE IF EXISTS {self.db}")
+            )
+            logger.info(f"Database {self.db} successfully dropped.")
+        except Exception as e:
+            logger.error(f"Failed to drop database {self.db}: {str(e)}", exc_info=True)
+            raise
+
     async def table_exists(self) -> bool:
         self._ensure_database()
         loop = asyncio.get_running_loop()
@@ -82,7 +97,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
                 None,
                 lambda: self.client.command(ddl)
             )
-            
+    
     async def drop_table(self) -> None:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: self.client.command(f"DROP TABLE IF EXISTS {self.db}.{self.table_name}"))
@@ -91,13 +106,11 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: self.client.command(f"TRUNCATE TABLE {self.db}.{self.table_name}"))
 
-    # Обновление и сохранение данных
     async def update(self, df: pd.DataFrame) -> None:
         """
         Обновляет (дополняет) таблицу новыми данными из DataFrame.
         В ClickHouse обычно просто вставляем новые записи.
         """
-        # Приводим DataFrame к списку моделей (твоего BaseModel)
         records = []
         for _, row in df.iterrows():
             data = row.to_dict()
@@ -141,11 +154,9 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             self.db = db
             self.table_name = table
 
-            # Проверяем и создаём базу, если нужно
             if not await self.database_exists():
                 self.client.command(f"CREATE DATABASE IF NOT EXISTS {db}")
 
-            # Проверяем и создаём таблицу, если нужно
             if not await self.table_exists():
                 ddl = f"""
                     CREATE TABLE {db}.{table} (
@@ -155,7 +166,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
                 """
                 self.client.command(ddl)
 
-            # Вставляем строку
             self.client.insert(
                     table=table,
                     data=[[data_str]],
