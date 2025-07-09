@@ -26,7 +26,6 @@ def archive_processor(mock_repos):
     with patch('os.path.exists', return_value=True):
         yield processor
 
-
 @pytest.mark.asyncio
 async def test_process_single_archive_success(archive_processor, mock_repos):
     mock_repo_snapshots, mock_repo_filenames = mock_repos
@@ -68,15 +67,9 @@ async def test_process_single_archive_success(archive_processor, mock_repos):
                 table=settings.clickhouse.table_orderbook_archive_filename,
                 data_str="valid.zip"
             )
-            # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Ожидаем фактический лог, который происходит в начале обработки ---
+            
             archive_processor.logger.info.assert_called_with("Обработка файла valid.zip...")
-            # If you want to assert the "successfully processed" message, you need to ensure it's actually logged
-            # by the ArchiveProcessor *after* the processing is complete.
-            # If your ArchiveProcessor logs this message after successful completion, you can add another assert:
-            # archive_processor.logger.info.assert_any_call("Файл valid.zip успешно обработан.")
-            # Or if it's the *only* info call after initial one, you might check all_calls.
-
-# --- Остальные тесты (оставляем без изменений) ---
+    
 @pytest.mark.asyncio
 async def test_process_single_archive_empty_dataframe(archive_processor):
     with patch('application.archive_processor.ZipDataLoader') as MockZipDataLoader:

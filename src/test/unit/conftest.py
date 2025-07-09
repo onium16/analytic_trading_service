@@ -1,26 +1,25 @@
-# test/unit/conftest.py
+
 import pytest
 import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-# Импортируем реальный класс из его файла
 from domain.strategies.strategy_default_settings import StrategyDefaultSettings as RealStrategyDefaultSettings
 
-# Мокаем функции, которые реально нужны для импортов
+
 def mock_extract_default_value(param_config):
-    # Возвращаем первое значение из values или None
+    
     return param_config.get("values", [None])[0]
 
 def mock_check_required_fields(*args, **kwargs):
-    # Заглушка, возвращаем True (или подходящее значение)
+    
     return True
 
 def mock_is_sustained_positive(*args, **kwargs):
     return True
 
 def mock_parse_strategy_params_from_file(*args, **kwargs):
-    # Возвращаем пустой или тестовый словарь с параметрами стратегий
+    
     return {
                         "S_BidAcc": {
                             "period": {"type": "integer", "values": [5]},
@@ -65,7 +64,6 @@ def mock_parse_strategy_params_from_file(*args, **kwargs):
                         }
                         }
 
-# Создаём мок-модуль domain.strategies.base_strategy_utils
 mock_base_utils = type(sys)("domain.strategies.base_strategy_utils")
 mock_base_utils.StrategyDefaultSettings = RealStrategyDefaultSettings
 mock_base_utils.extract_default_value = mock_extract_default_value
@@ -73,12 +71,11 @@ mock_base_utils.check_required_fields = mock_check_required_fields
 mock_base_utils.is_sustained_positive = mock_is_sustained_positive
 mock_base_utils.parse_strategy_params_from_file = mock_parse_strategy_params_from_file
 
-# Регистрируем мок-модуль в sys.modules, чтобы импорт проходил корректно
 sys.modules["domain.strategies.base_strategy_utils"] = mock_base_utils
 
 @pytest.fixture(scope="session", autouse=True)
 def patch_global_dependencies():
-    # Подготовка тестовых параметров стратегий
+    
     strategy_params = {
                         "S_BidAcc": {
                             "period": {"type": "integer", "values": [5]},
@@ -123,7 +120,6 @@ def patch_global_dependencies():
                         }
                         }
 
-
     with patch("application._backtest_param_parser.parse_strategy_params_from_file") as mock_parse_func, \
          patch("infrastructure.config.settings.BacktestingSettings") as MockBTSettings, \
          patch("infrastructure.config.settings.settings") as mock_settings:
@@ -147,9 +143,3 @@ def patch_global_dependencies():
         mock_settings.backtesting.cash = 10000
 
         yield
-
-
-import numpy as np
-
-arr = np.array([np.int32(1), np.float64(2.5), np.bool_(True)])
-print(arr)

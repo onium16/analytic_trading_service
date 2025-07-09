@@ -557,7 +557,8 @@ class BacktestRunner:
 
             end_process_time = datetime.datetime.now()
             self.logger.info(f"\nOverall script duration: {end_process_time - start_process_time}")
-
+            return results_df
+        
         except Exception as e:
             self.logger.error(f"Backtest failed: {str(e)}", exc_info=True)
             sys.exit(1)

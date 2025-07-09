@@ -8,7 +8,7 @@ class StorageInitializer:
         self.client = client
 
     async def create_database(self, db_name: str):
-        cur = await self.client.cursor()
+        cur = self.client.cursor()
         async with cur:
             await cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
             self.logger.info(f"Инициализация базы данных {db_name} ClickHouse...")

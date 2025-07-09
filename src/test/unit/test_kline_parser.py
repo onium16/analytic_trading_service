@@ -9,7 +9,7 @@ from infrastructure.config.settings import settings
 from infrastructure.storage.schemas import KlineRecord, KlineRecordDatetime
 import requests
 
-# Мок для ClickHouseRepository с нужной схемой
+
 @pytest.fixture
 def mock_kline_repo():
     repo = AsyncMock(spec=ClickHouseRepository)
@@ -23,19 +23,17 @@ def mock_kline_datetime_repo():
     repo.get_all.return_value = []
     return repo
 
-# Фикстура для KlineParser с подменой URL и моком repo_save_date
 @pytest.fixture
 def kline_parser(mock_kline_repo, mock_kline_datetime_repo):
     with patch('infrastructure.config.settings.settings.binance.kline_url', 'https://testnet.binance.vision/api/v3/klines'):
         parser = KlineParser(
             repository=mock_kline_repo,
             symbol="ETHUSDT",
-            interval="1" # Consistent interval for the parser
+            interval="1" 
         )
         parser.repo_save_date = mock_kline_datetime_repo
         return parser
 
-# Мок requests.get (универсальный)
 @pytest.fixture
 def mock_requests_get():
     with patch('requests.get') as mock_get:
@@ -53,11 +51,10 @@ def test_daterange():
 
 @pytest.mark.asyncio
 async def test_is_date_already_processed(kline_parser, mock_kline_datetime_repo):
-    # Дата не обработана
+    
     mock_kline_datetime_repo.get_all.return_value = []
     assert not await kline_parser.is_date_already_processed("2025-07-01")
 
-    # Дата обработана с таким же интервалом
     processed_record = KlineRecordDatetime(
         exchange=settings.binance.name,
         symbol=kline_parser.symbol,
@@ -68,7 +65,7 @@ async def test_is_date_already_processed(kline_parser, mock_kline_datetime_repo)
     mock_kline_datetime_repo.get_all.return_value = [processed_record]
     assert await kline_parser.is_date_already_processed("2025-07-01")
 
-    # Дата обработана с другим интервалом — должна вернуть False
+    
     other_interval = "5m" if kline_parser.interval != "5m" else "1m"
     processed_record_other = KlineRecordDatetime(
         exchange=settings.binance.name,
@@ -80,7 +77,6 @@ async def test_is_date_already_processed(kline_parser, mock_kline_datetime_repo)
     mock_kline_datetime_repo.get_all.return_value = [processed_record_other]
     assert not await kline_parser.is_date_already_processed("2025-07-01")
 
-
 @pytest.mark.asyncio
 async def test_mark_date_processed(kline_parser, mock_kline_datetime_repo):
     await kline_parser.mark_date_processed("2025-07-01")
@@ -89,13 +85,9 @@ async def test_mark_date_processed(kline_parser, mock_kline_datetime_repo):
     saved_record = mock_kline_datetime_repo.save_batch.call_args[0][0][0]
     assert saved_record.symbol == "ETHUSDT"
     
-    # REMOVE THIS LINE: You are changing the parser's interval AFTER it has already performed the action
-    # kline_parser.interval = "1" 
-    
-    # The parser's interval (from the fixture and __init__) is "1m", so expect "1m" in the data
     expected_data_part = f'"date": "2025-07-01", "interval": "{kline_parser.interval}"'
     assert expected_data_part in saved_record.data
-    assert saved_record.interval == "1m" # This assertion is correct for a "1m" interval.
+    assert saved_record.interval == "1m" 
 
 def test_parse_date_yyyy_mm_dd(kline_parser):
     date = kline_parser.parse_date("2025-01-15")
@@ -106,7 +98,7 @@ def test_parse_date_dd_mm_yyyy(kline_parser):
     assert date == datetime(2025, 1, 15)
 
 def test_parse_date_unsupported_format(kline_parser):
-    with pytest.raises(ValueError, match="Неподдерживаемый формат даты"):
+    with pytest.raises(ValueError, match="Unsupported date format: 2025/01/15"):
         kline_parser.parse_date("2025/01/15")
 
 def test_get_binance_ohlcv_day_empty_response(mock_requests_get, kline_parser):

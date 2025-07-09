@@ -53,10 +53,8 @@ async def kline_parser(mock_repository):
     ("invalid", False),
 ])
 def test_is_supported_date_format(kline_parser, date_str, expected):
-    # Act
     result = kline_parser.is_supported_date_format(date_str)
     
-    # Assert
     assert result == expected
 
 @pytest.mark.parametrize("date_str, expected", [
@@ -66,55 +64,48 @@ def test_is_supported_date_format(kline_parser, date_str, expected):
     ("1735689600000", datetime(2025, 1, 1, 0, 0, 0)),
 ])
 def test_parse_date(kline_parser, date_str, expected):
-    # Act
+    
     result = kline_parser.parse_date(date_str)
     
-    # Assert
     assert result == expected
-    assert result.tzinfo is None  # Ensure naive datetime
+    assert result.tzinfo is None  
 
 @pytest.mark.asyncio
 async def test_is_date_already_processed_not_processed(kline_parser, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.interval = "1m"
     mock_save_date_repository.get_all.return_value = []
     
-    # Act
     result = await kline_parser.is_date_already_processed("2025-06-01")
     
-    # Assert
     assert result is False
     mock_save_date_repository.get_all.assert_awaited_once()
 
 @pytest.mark.asyncio
 async def test_is_date_already_processed_already_processed(kline_parser, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.interval = "1m"
     mock_save_date_repository.get_all.return_value = [
         {"data": json.dumps({"date": "2025-06-01", "interval": "1m"})}
     ]
     
-    # Act
     result = await kline_parser.is_date_already_processed("2025-06-01")
     
-    # Assert
     assert result is True
     mock_save_date_repository.get_all.assert_awaited_once()
 
 @pytest.mark.asyncio
 async def test_mark_date_processed(kline_parser, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.symbol = "BTCUSDT"
     kline_parser.interval = "1m"
     settings.binance.name = "binance"
     
-    # Act
     await kline_parser.mark_date_processed("2025-06-01")
     
-    # Assert
     mock_save_date_repository.ensure_table.assert_awaited_once()
     mock_save_date_repository.save_batch.assert_awaited_once()
     call_args = mock_save_date_repository.save_batch.call_args[0][0][0]
@@ -154,7 +145,7 @@ def get_binance_ohlcv_day(symbol: str = 'ETHUSDT', date_str: str = '2025-06-01',
             break
 
         all_data.extend(raw_data)
-        current_time = raw_data[-1][0] + 60_000  # сдвигаемся на одну минуту вперед
+        current_time = raw_data[-1][0] + 60_000  
         time.sleep(0.1)
 
     df = pd.DataFrame(all_data, columns=[
@@ -173,7 +164,7 @@ def get_binance_ohlcv_day(symbol: str = 'ETHUSDT', date_str: str = '2025-06-01',
 
 @pytest.mark.asyncio
 async def test_fetch_and_save_day_success(kline_parser, mock_repository, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo = mock_repository
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.symbol = "BTCUSDT"
@@ -186,20 +177,20 @@ async def test_fetch_and_save_day_success(kline_parser, mock_repository, mock_sa
     ]
     
     with requests_mock.Mocker() as m:
-        # Return mock_data for the first request, then [] for subsequent requests to exit the loop
+        
         m.get(
             settings.binance.kline_url,
             [
                 {"json": mock_data, "status_code": 200},
-                {"json": [], "status_code": 200},  # Empty response to break the loop
+                {"json": [], "status_code": 200},  
             ]
         )
         with patch.object(kline_parser, "is_date_already_processed", AsyncMock(return_value=False)):
             with patch.object(kline_parser, "mark_date_processed", AsyncMock()):
-                # Act
+                
                 await kline_parser.fetch_and_save_day(datetime(2021, 7, 1))
                 
-                # Assert
+                
                 kline_parser.is_date_already_processed.assert_awaited_once_with("2021-07-01")
                 mock_repository.save_batch.assert_awaited_once()
                 kline_parser.mark_date_processed.assert_awaited_once_with("2021-07-01")
@@ -212,17 +203,15 @@ async def test_fetch_and_save_day_success(kline_parser, mock_repository, mock_sa
 
 @pytest.mark.asyncio
 async def test_fetch_and_save_day_already_processed(kline_parser, mock_repository, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo = mock_repository
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.symbol = "BTCUSDT"
     kline_parser.interval = "1m"
     settings.binance.name = "binance"
-
-    # Act
+    
     await kline_parser.mark_date_processed("2025-06-01")
 
-    # Assert
     mock_save_date_repository.ensure_table.assert_awaited_once()
     mock_save_date_repository.save_batch.assert_awaited_once()
     call_args = mock_save_date_repository.save_batch.call_args[0][0][0]
@@ -233,7 +222,7 @@ async def test_fetch_and_save_day_already_processed(kline_parser, mock_repositor
 
 @pytest.mark.asyncio
 async def test_collect_kline_range(kline_parser, mock_repository, mock_save_date_repository):
-    # Arrange
+    
     kline_parser.repo = mock_repository
     kline_parser.repo_save_date = mock_save_date_repository
     kline_parser.symbol = "BTCUSDT"
@@ -245,22 +234,21 @@ async def test_collect_kline_range(kline_parser, mock_repository, mock_save_date
         [1743984000000, "50000", "51000", "49000", "50500", "1000", 1743984060000, "5000000", 100, "500", "2500000", "0"],
     ]
     with requests_mock.Mocker() as m:
-        # Return mock_data for each day to ensure save_batch is called twice
+        
         m.get(
             settings.binance.kline_url,
             [
-                {"json": mock_data, "status_code": 200},  # First day (2025-07-01)
-                {"json": [], "status_code": 200},         # End of data for first day
-                {"json": mock_data, "status_code": 200},  # Second day (2025-07-02)
-                {"json": [], "status_code": 200},         # End of data for second day
+                {"json": mock_data, "status_code": 200},  
+                {"json": [], "status_code": 200},         
+                {"json": mock_data, "status_code": 200},  
+                {"json": [], "status_code": 200},         
             ]
         )
         with patch.object(kline_parser, "is_date_already_processed", AsyncMock(return_value=False)):
             with patch.object(kline_parser, "mark_date_processed", AsyncMock()):
-                # Act
+                
                 await kline_parser.collect_kline_range("01-07-2025", "02-07-2025")
                 
-                # Assert
                 assert kline_parser.is_date_already_processed.await_count == 2
                 assert mock_repository.save_batch.await_count == 2
                 assert kline_parser.mark_date_processed.await_count == 2

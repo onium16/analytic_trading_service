@@ -43,19 +43,19 @@ from infrastructure.adapters.archive_kline_parser import KlineParser
 logger = setup_logger(__name__, level=settings.logger_level)
 
 # Выбрать тестовую сеть мы можем только при работе св режиме стриминга
-TEST_NET = False
+TEST_NET = True
 
 # Collect archive data (zip, parsing)
-ARCHIVE_MODE = True
+ARCHIVE_MODE = False
 
 # Backtest strategies on archive data or stream data 
-BACKTEST_MODE = True
+BACKTEST_MODE = False
 ARCHIVE_SOURCE = True
 STREAM_SOURCE = False
 
 # Stream data + Air BackTesting + Trading
-STREAM_MODE = False
-USE_WS = True # API/WebSocket)
+STREAM_MODE = True
+USE_WS = False # API/WebSocket)
 
 
 async def initialisation_storage(testnet=False):
@@ -96,7 +96,7 @@ async def initialisation_storage(testnet=False):
         await initializer.initialize(tables_to_init)
 
     except Exception as e:
-        logger.error(f"Ошибка инициализации базы данных: {str(e)}")
+        logger.error(f"Ошибка инициализации базы данных: {str(e)}", exc_info=True)
         sys.exit(1)
 
 async def run_basktest_application():
@@ -124,7 +124,7 @@ async def run_basktest_application():
         
         await backtest_runner.run_backtest()
 
-    if ARCHIVE_SOURCE:
+    if ARCHIVE_SOURCE :
         logger.info("Запуск оценки стратегий... По архивным данным. Обновление параметров стратегий.")
         # Оцениваем стратегии
         # flag delta
@@ -295,7 +295,7 @@ async def main():
 
         await initialisation_storage(TEST_NET)
 
-        if ARCHIVE_MODE:
+        if ARCHIVE_MODE and not TEST_NET:
             await run_archive_application()
         if BACKTEST_MODE:
             await run_basktest_application()

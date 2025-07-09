@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
 
 
-# Пример модели данных
 class MyTestModel(BaseModel):
     id: int
     name: str
