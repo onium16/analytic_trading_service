@@ -99,9 +99,9 @@ CONFIG_DIR = Path(__file__).parent
 
 class BacktestingSettings(BaseSettings):
     name: str = "backtesting"
-    default_file_settings: str
-    best_file_settings: str
-    custom_file_settings: str
+    default_file_settings: str = "default_strategy_settings.json"
+    best_file_settings: str = "best_strategy_settings.json"
+    custom_file_settings: str = "custom_strategy_settings.json"
     cash: int = 100000
 
     model_config = SettingsConfigDict(
