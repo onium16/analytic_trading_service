@@ -1,6 +1,7 @@
 # src/infrastructure/storage/repositories/clickhouse_repository.py
 
 import asyncio
+import os
 from typing import List, Type, TypeVar, Generic, Union, Optional, get_origin, get_args
 from decimal import Decimal
 from datetime import datetime
@@ -21,14 +22,24 @@ executor = ThreadPoolExecutor()
 T = TypeVar("T", bound=BaseModel)
 
 class ClickHouseRepository(BaseRepository[T], Generic[T]):
-    def __init__(self, schema: Type[T], table_name: str, db: str = "default", port: int = 8123):
+    def __init__(self, schema: Type[T], table_name: str, db: str = "default"):
         self.schema = schema
         self.table_name = table_name
-        self.port = port
         self.db = db
 
-        self.client = get_client(port=port)  # Изначально default
-        
+        ch_host = os.getenv('CLICKHOUSE_HOST', 'localhost')
+        ch_port = int(os.getenv('CLICKHOUSE_PORT', '8123'))
+        ch_user = os.getenv('CLICKHOUSE_USER', 'default')
+        ch_password = os.getenv('CLICKHOUSE_PASSWORD', '') # Пароль может быть пустым по умолчанию
+
+        # Инициализация клиента ClickHouse с использованием полученных параметров
+        self.client = get_client(
+            host=ch_host,
+            port=ch_port,
+            username=ch_user,
+            password=ch_password,
+            database=db
+        )
         # Ленивая инициализация базы — база создастся при первом обращении
         self._db_checked = False
 
