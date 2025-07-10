@@ -164,13 +164,11 @@ async def main():
         schema=KlineArchive,
         db=settings.clickhouse.db_name,
         table_name=settings.clickhouse.table_kline_archive,
-        port=8123,
     )
     repo_orderbook = ClickHouseRepository(
         schema=OrderbookSnapshotModel,
         db=settings.clickhouse.db_name,
         table_name=settings.clickhouse.table_orderbook_snapshots,
-        port=8123,
     )
 
     # Убедимся, что таблицы существуют (опционально)

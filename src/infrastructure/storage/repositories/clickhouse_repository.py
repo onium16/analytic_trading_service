@@ -1,5 +1,3 @@
-# src/infrastructure/storage/repositories/clickhouse_repository.py
-
 import asyncio
 import os
 from typing import List, Type, TypeVar, Generic, Union, Optional, get_origin, get_args
@@ -9,60 +7,66 @@ import json
 import pandas as pd
 from pydantic import BaseModel
 from infrastructure.storage.repositories.base_repository import BaseRepository
+from clickhouse_connect.driver.client import Client as ClickHouseClient
 from clickhouse_connect import get_client
+from clickhouse_connect.driver.exceptions import OperationalError, DatabaseError
 from concurrent.futures import ThreadPoolExecutor
 from infrastructure.logging_config import setup_logger
 
 
 logger = setup_logger(__name__)
 
-# Создаём один экземпляр пула потоков для переиспользования
+
 executor = ThreadPoolExecutor()
 
 T = TypeVar("T", bound=BaseModel)
 
 class ClickHouseRepository(BaseRepository[T], Generic[T]):
+    client: ClickHouseClient
+
     def __init__(self, schema: Type[T], table_name: str, db: str = "default"):
         self.schema = schema
         self.table_name = table_name
         self.db = db
 
+       
         ch_host = os.getenv('CLICKHOUSE_HOST', 'localhost')
+
         ch_port = int(os.getenv('CLICKHOUSE_PORT', '8123'))
         ch_user = os.getenv('CLICKHOUSE_USER', 'default')
-        ch_password = os.getenv('CLICKHOUSE_PASSWORD', '') # Пароль может быть пустым по умолчанию
+        ch_password = os.getenv('CLICKHOUSE_PASSWORD', '') 
 
-        # Инициализация клиента ClickHouse с использованием полученных параметров
+        
         self.client = get_client(
             host=ch_host,
             port=ch_port,
             username=ch_user,
             password=ch_password,
-            database=db
+            database=db 
         )
-        # Ленивая инициализация базы — база создастся при первом обращении
-        self._db_checked = False
 
-    def _ensure_database(self):
-        # Этот метод синхронный, вызываем при первом запросе
-        if not self._db_checked:
-            exists = self.client.command(f"EXISTS DATABASE {self.db}")
-            if not bool(int(exists)):
-                self.client.command(f"CREATE DATABASE {self.db}")
-            # Теперь переключаем клиент на нужную базу
-            self.client = get_client(port=self.port, database=self.db)
-            self._db_checked = True
+        try:
+            self.client.ping()
+            logger.info(f"Успешное подключение к ClickHouse по адресу: {ch_host}:{ch_port}")
+        except OperationalError as e:
+            logger.error(f"Ошибка подключения к ClickHouse: {e}")
+            raise 
 
+        try:
+            self.client.command(f"CREATE DATABASE IF NOT EXISTS {self.db}")
+            print(f"База данных '{self.db}' успешно создана (или уже существовала).")
+        except OperationalError as e:
+            print(f"Не удалось создать базу данных '{self.db}': {e}")
+            raise 
+ 
     async def database_exists(self) -> bool:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, lambda: self.client.command(f"EXISTS DATABASE {self.db}"))
-        # Handle possible return types: int, str, or QuerySummary
         if isinstance(result, int):
             return bool(result)
         elif isinstance(result, str):
             return bool(int(result))
         elif hasattr(result, 'result_rows'):
-            # QuerySummary: extract first value if possible
             rows = getattr(result, 'result_rows', [])
             if rows and rows[0]:
                 return bool(int(rows[0][0]))
@@ -90,7 +94,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             raise
 
     async def table_exists(self) -> bool:
-        self._ensure_database()
         loop = asyncio.get_running_loop()
         query = f"""
         SELECT name FROM system.tables
@@ -104,7 +107,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         Создаёт таблицу в базе, если она не существует.
         Поля создаются на основе Pydantic-схемы.
         """
-        self._ensure_database()
         if not await self.table_exists():
             fields: List[str] = []
             for name, field in self.schema.model_fields.items():
@@ -160,7 +162,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
-                executor,
+                executor, # Используем общий пул потоков
                 lambda: self.client.insert(f"{self.db}.{self.table_name}", data, column_names=columns)
             )
         except Exception as e:
@@ -168,33 +170,56 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
     
     async def save_string_to_table(self, db: str, table: str, data_str: str) -> None:
         # Сохраним текущие значения, чтобы временно переключиться
-                
         orig_db = self.db
         orig_table = self.table_name
 
+        loop = asyncio.get_running_loop() # Получаем цикл событий один раз
+
         try:
-            # Переключаемся на нужную базу и таблицу
             self.db = db
             self.table_name = table
 
-            if not await self.database_exists():
-                self.client.command(f"CREATE DATABASE IF NOT EXISTS {db}")
+            db_exists_raw_result = await loop.run_in_executor(None, lambda: self.client.command(f"EXISTS DATABASE {db}"))
+            db_exists = False
+            if isinstance(db_exists_raw_result, int):
+                db_exists = bool(db_exists_raw_result)
+            elif isinstance(db_exists_raw_result, str):
+                db_exists = bool(int(db_exists_raw_result))
+            elif hasattr(db_exists_raw_result, 'result_rows'):
+                rows = getattr(db_exists_raw_result, 'result_rows', [])
+                if rows and rows[0]:
+                    db_exists = bool(int(rows[0][0]))
+            else:
+                raise TypeError(f"Unexpected result type from client.command for database_exists: {type(db_exists_raw_result)}")
 
-            if not await self.table_exists():
+            if not db_exists:
+                await loop.run_in_executor(None, lambda: self.client.command(f"CREATE DATABASE {db}"))
+
+
+            table_exists_query = f"""
+            SELECT name FROM system.tables
+            WHERE database = '{db}' AND name = '{table}'
+            """
+            table_exists_result = await loop.run_in_executor(None, lambda: self.client.query(table_exists_query))
+            if not len(table_exists_result.result_rows) > 0:
                 ddl = f"""
                     CREATE TABLE {db}.{table} (
                         data String
                     ) ENGINE = MergeTree()
                     ORDER BY tuple()
                 """
-                self.client.command(ddl)
+                await loop.run_in_executor(None, lambda: self.client.command(ddl))
 
-            self.client.insert(
+            # Вставляем данные
+            await loop.run_in_executor(
+                executor, # Используем общий пул потоков
+                lambda: self.client.insert(
                     table=table,
                     data=[[data_str]],
                     database=db,
-                    column_names=["filename"]
+                    column_names=["data"] # Имя столбца должно соответствовать DDL
                 )
+            )
 
         finally:
             # Возвращаем исходные значения
@@ -203,26 +228,34 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
 
     # ЗАПРОСЫ
     async def get_last_n(self, symbol: str, n: int) -> List[T]:
-        rows = self.client.query(
-            f"""
-            SELECT * FROM {self.db}.{self.table_name}
-            WHERE symbol = %(symbol)s
-            ORDER BY timestamp DESC
-            LIMIT %(n)s
-            """,
-            parameters={"symbol": symbol, "n": n}
-        ).result_rows
+        loop = asyncio.get_running_loop()
+        rows = await loop.run_in_executor(
+            None,
+            lambda: self.client.query(
+                f"""
+                SELECT * FROM {self.db}.{self.table_name}
+                WHERE symbol = %(symbol)s
+                ORDER BY timestamp DESC
+                LIMIT %(n)s
+                """,
+                parameters={"symbol": symbol, "n": n}
+            ).result_rows
+        )
         return [self._deserialize_row(dict(zip(self.schema.model_fields.keys(), row))) for row in rows]
 
     async def get_all(self) -> List[T]:
-        rows = self.client.query(f"SELECT * FROM {self.db}.{self.table_name}").result_rows
+        loop = asyncio.get_running_loop()
+        rows = await loop.run_in_executor(
+            None,
+            lambda: self.client.query(f"SELECT * FROM {self.db}.{self.table_name}").result_rows
+        )
         return [self._deserialize_row(dict(zip(self.schema.model_fields.keys(), row))) for row in rows]
 
     async def fetch_dataframe(self, query: str, params: Optional[dict] = None) -> pd.DataFrame:
-        result = self.client.query(query)  # тут result — сразу list строк, у него нет column_names
-        columns = result.column_names  # Ошибка: result — это list, у него нет column_names
-        rows = list(result.result_rows)  # Ошибка: result — list, нет .result_rows
-        # logger.debug(columns)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: self.client.query(query, parameters=params))
+        columns = result.column_names
+        rows = result.result_rows
         df = pd.DataFrame(rows, columns=columns)
         logger.debug(df)
         if "timestamp" in df.columns:
@@ -230,11 +263,12 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         return df
 
     async def get_max_timestamp(self, column: str = 'ts', filter_expr: str = '') -> pd.Timestamp | None:
-        query = f"SELECT max({column}) FROM {self.table_name}"
+        loop = asyncio.get_running_loop()
+        query = f"SELECT max({column}) FROM {self.db}.{self.table_name}" # Добавлено self.db
         if filter_expr:
             query += f" WHERE {filter_expr}"
 
-        result = self.client.query(query)
+        result = await loop.run_in_executor(None, lambda: self.client.query(query))
         rows = result.result_rows
         max_ts = rows[0][0] if rows and rows[0][0] is not None else None
 

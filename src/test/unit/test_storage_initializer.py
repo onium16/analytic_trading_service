@@ -100,10 +100,9 @@ async def setup_unique_test_db():
     unique_db_name = f"test_db_{uuid.uuid4().hex[:8]}_{datetime.now(tz=timezone.utc).strftime('%H%M%S')}"
     
     temp_repo = ClickHouseRepository(
-        schema=OrderbookSnapshotModel, # Схема здесь не важна, т.к. мы управляем БД
+        schema=OrderbookSnapshotModel,
         table_name="temp_table_for_db_ops",
-        db=unique_db_name, # Указываем нашу тестовую базу
-        port=settings.clickhouse.port_http # Используем порт из настроек
+        db=unique_db_name, 
     )
 
     try:
@@ -144,7 +143,6 @@ async def test_initialisation_storage_integration(setup_unique_test_db):
             schema=OrderbookSnapshotModel,
             table_name="temp_check_table",
             db=test_db_name,
-            port=settings.clickhouse.port_http
         )
         
         # Проверяем, что база данных была создана
