@@ -4,6 +4,7 @@ import pytest
 import pytest_asyncio
 from decimal import Decimal
 from datetime import datetime, timezone
+from typing import AsyncGenerator
 from pydantic import BaseModel
 from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
 
@@ -14,14 +15,14 @@ class MyTestModel(BaseModel):
     price: Decimal
     ts: datetime
 
-
 @pytest_asyncio.fixture(scope="function")
-async def repo() -> ClickHouseRepository:
+async def repo() -> AsyncGenerator[ClickHouseRepository, None]:
     """
     Асинхронная фикстура: создаёт временную таблицу в ClickHouse и удаляет её после теста.
     """
     table_name = "test_table"
-    db_name = "test_db"
+    db_name = "default"
+    db_name = "default"
 
     repository = ClickHouseRepository(schema=MyTestModel, table_name=table_name, db=db_name)
 

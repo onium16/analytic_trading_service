@@ -62,7 +62,7 @@ jobs:
       CLICKHOUSE_PASSWORD: password
 
       # ClickHouse DB settings (для Pydantic)
-      CLICKHOUSE_DB_NAME: oraculv2
+      CLICKHOUSE_DB_NAME: default
 
       # Tables names (для Pydantic)
       CLICKHOUSE_TABLE_KLINE_ARCHIVE: kline_archive

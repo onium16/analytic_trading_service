@@ -47,7 +47,7 @@ def storage_initializer(mock_clickhouse_client):
 
 @pytest.mark.asyncio
 async def test_create_database(storage_initializer, mock_clickhouse_client):
-    db_name = "test_db"
+    db_name = "default"
     
     await storage_initializer.create_database(db_name)
     
