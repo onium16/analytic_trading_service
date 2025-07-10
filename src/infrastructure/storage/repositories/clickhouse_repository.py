@@ -27,7 +27,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
     def __init__(self, schema: Type[T], table_name: str, db: str = "default"):
         self.schema = schema
         self.table_name = table_name
-        self.db = db
+        self.db = db if db and db != 'default' else os.getenv('CLICKHOUSE_DB_NAME', 'default')
        
         ch_host = os.getenv('CLICKHOUSE_HOST', 'localhost')
 
@@ -41,6 +41,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             port=ch_port,
             username=ch_user,
             password=ch_password,
+            database=db # Возвращено: клиент будет сразу пытаться подключиться к этой БД
         )
 
         try:
@@ -52,9 +53,9 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
 
         try:
             self.client.command(f"CREATE DATABASE IF NOT EXISTS {self.db}")
-            print(f"База данных '{self.db}' успешно создана (или уже существовала).")
+            logger.info(f"База данных '{self.db}' успешно создана (или уже существовала).")
         except OperationalError as e:
-            print(f"Не удалось создать базу данных '{self.db}': {e}")
+            logger.error(f"Не удалось создать базу данных '{self.db}': {e}")
             raise 
  
     async def database_exists(self) -> bool:

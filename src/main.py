@@ -43,7 +43,7 @@ from infrastructure.adapters.archive_kline_parser import KlineParser
 logger = setup_logger(__name__, level=settings.logger_level)
 
 # Выбрать тестовую сеть мы можем только при работе св режиме стриминга
-TEST_NET = True
+TEST_NET = False
 
 # Collect archive data (zip, parsing)
 ARCHIVE_MODE = False
@@ -67,8 +67,6 @@ async def initialisation_storage(testnet=False):
         # временно сохранить текущую базу
         orig_db_name = settings.clickhouse.db_name
 
-        # подключаемся к базе default (которая есть)
-        settings.clickhouse.db_name = 'default'
         client = await settings.clickhouse.connect()
 
         initializer = StorageInitializer(settings, logger, client)
@@ -288,7 +286,6 @@ async def run_stream_application(use_ws: bool = False):
             logger.info("Все задачи завершены.")
 
     logger.info("Завершение приложения.")
-
 
 async def main():
     try:
