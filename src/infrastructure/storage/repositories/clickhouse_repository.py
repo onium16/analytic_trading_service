@@ -28,7 +28,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
         self.schema = schema
         self.table_name = table_name
         self.db = db
-
        
         ch_host = os.getenv('CLICKHOUSE_HOST', 'localhost')
 
@@ -42,7 +41,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             port=ch_port,
             username=ch_user,
             password=ch_password,
-            database=db 
         )
 
         try:
