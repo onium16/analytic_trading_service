@@ -41,7 +41,7 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             port=ch_port,
             username=ch_user,
             password=ch_password,
-            database=db # Возвращено: клиент будет сразу пытаться подключиться к этой БД
+            database=db 
         )
 
         try:

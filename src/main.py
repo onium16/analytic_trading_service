@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 
 import aiohttp
@@ -24,17 +23,7 @@ from domain.events.data_events import KlineDataReceivedEvent, KlineDataReceivedW
 from infrastructure.config.config_loader import apply_environment_settings
 from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
 from infrastructure.storage.repositories.storage_initializer import StorageInitializer
-from infrastructure.storage.schemas import (
-    KlineRecord,
-    KlineRecordDatetime,
-    OrderBookDelta,
-    OrderBookFilenameModel,
-    OrderBookSnapshot,
-    OrderbookSnapshotModel,
-    TradeResult,
-    TradeSignal,
-)
-
+from infrastructure.storage.schemas import KlineRecord
 from infrastructure.logging_config import setup_logger
 from infrastructure.config.settings import settings
 
@@ -43,7 +32,7 @@ from infrastructure.adapters.archive_kline_parser import KlineParser
 logger = setup_logger(__name__, level=settings.logger_level)
 
 # Выбрать тестовую сеть мы можем только при работе св режиме стриминга
-TEST_NET = False
+TEST_NET = True
 
 # Collect archive data (zip, parsing)
 ARCHIVE_MODE = False
@@ -57,45 +46,6 @@ STREAM_SOURCE = False
 STREAM_MODE = True
 USE_WS = False # API/WebSocket)
 
-
-async def initialisation_storage(testnet=False):
-    try:
-        # Проверяем флаг тестнет и применяем настройки все параметры (базыданных и таблицы используюстя с префиксом _testnet
-        # все адреса API и т.д. testnet 
-        apply_environment_settings(settings, testnet)
-
-        # временно сохранить текущую базу
-        orig_db_name = settings.clickhouse.db_name
-
-        client = await settings.clickhouse.connect()
-
-        initializer = StorageInitializer(settings, logger, client)
-
-        # создаём базу нужную
-        await initializer.create_database(db_name=orig_db_name)
-
-        await client.close()
-
-        # восстановить базу и подключиться к ней
-        settings.clickhouse.db_name = orig_db_name
-        client = await settings.clickhouse.connect()
-        initializer.client = client
-        
-        tables_to_init = [
-            (OrderbookSnapshotModel, settings.clickhouse.table_orderbook_snapshots),
-            (OrderBookFilenameModel, settings.clickhouse.table_orderbook_archive_filename),
-            (KlineRecord, settings.clickhouse.table_kline_archive),
-            (KlineRecordDatetime, settings.clickhouse.table_kline_archive_datetime),
-            (TradeSignal, settings.clickhouse.table_trade_signals),
-            (TradeResult, settings.clickhouse.table_trade_results),
-            (OrderBookDelta, settings.clickhouse.table_positions),
-        ]
-
-        await initializer.initialize(tables_to_init)
-
-    except Exception as e:
-        logger.error(f"Ошибка инициализации базы данных: {str(e)}", exc_info=True)
-        sys.exit(1)
 
 async def run_basktest_application():
     """
@@ -153,9 +103,7 @@ async def run_archive_application():
     """
     Функция запуска процессора для работы с архивными данными
     
-    """
-    
-    
+    """  
 
     logger.info("Запуск парсинга архивных данных свечей по дате ...")
     # Запускаем парсер свечей по дате и токену.
@@ -289,8 +237,15 @@ async def run_stream_application(use_ws: bool = False):
 
 async def main():
     try:
+        # Проверяем флаг тестнет и применяем настройки все параметры (базыданных и таблицы используюстя с префиксом _testnet
+        # все адреса API и т.д. testnet 
+        apply_environment_settings(settings, TEST_NET)
 
-        await initialisation_storage(TEST_NET)
+        client = await settings.clickhouse.connect(use_db=False)
+
+        initializer = StorageInitializer(settings, logger, client)
+        StorageInitializer(settings, logger, client)
+        await initializer.initialisation_storage()
 
         if ARCHIVE_MODE and not TEST_NET:
             await run_archive_application()

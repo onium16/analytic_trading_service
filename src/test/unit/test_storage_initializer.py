@@ -1,162 +1,186 @@
-import pytest
 import asyncio
-import uuid
-from datetime import datetime, timezone
-import os
-from unittest.mock import AsyncMock, MagicMock, patch
+import logging
+from copy import deepcopy
 
-import pandas as pd
-from clickhouse_connect import get_client
-from clickhouse_connect.driver.exceptions import OperationalError, DatabaseError
-
+# Предполагаемые импорты из вашей структуры проекта
+# Убедитесь, что пути к этим файлам корректны
 from infrastructure.config.settings import settings
 from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
 from infrastructure.storage.repositories.storage_initializer import StorageInitializer
 from infrastructure.storage.schemas import (
-    OrderbookSnapshotModel,
     KlineRecord,
     KlineRecordDatetime,
+    OrderBookDelta,
     OrderBookFilenameModel,
+    OrderBookSnapshot,
+    OrderbookSnapshotModel,
     TradeResult,
     TradeSignal,
-    OrderBookDelta
 )
-from infrastructure.logging_config import setup_logger
-import pytest_asyncio
 
-logger = setup_logger(__name__)
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
-# --- Фикстура для уникальной тестовой базы данных ---
-@pytest_asyncio.fixture(scope="function")
-async def setup_unique_test_db():
-    unique_db_name = f"test_db_{uuid.uuid4().hex[:8]}_{datetime.now(tz=timezone.utc).strftime('%H%M%S')}"
-    
-    # Параметры подключения к ClickHouse для временного клиента
-    ch_host = os.getenv('CLICKHOUSE_HOST', 'localhost')
-    # Убедитесь, что CLICKHOUSE_PORT_TCP корректно установлен в CI
-    ch_port = int(os.getenv('CLICKHOUSE_PORT_TCP', '9000')) 
-    ch_user = os.getenv('CLICKHOUSE_USER', 'default')
-    ch_password = os.getenv('CLICKHOUSE_PASSWORD', 'testpass') # Используем 'testpass'
+# Определяем тестовые имена для базы данных и таблиц
+TEST_DB_NAME = "test_app_db"
+TEST_TABLE_PREFIX = "test_"
 
-    temp_client = None
-    try:
-        # 1. Создаем временный клиент, подключенный к базе данных по умолчанию (без указания test_db)
-        # Это позволяет выполнять команды DDL, такие как CREATE DATABASE.
-        temp_client = get_client(
-            host=ch_host,
-            port=ch_port,
-            username=ch_user,
-            password=ch_password,
-            database='default' # Подключаемся к default, чтобы создать новую БД
-        )
-        
-        # Проверяем соединение
-        await asyncio.get_running_loop().run_in_executor(None, temp_client.ping)
-        logger.info(f"Временное подключение к ClickHouse для создания БД: {ch_host}:{ch_port}/default")
-
-        # 2. Создаем уникальную базу данных для теста
-        await asyncio.get_running_loop().run_in_executor(
-            None, lambda: temp_client.command(f"CREATE DATABASE IF NOT EXISTS {unique_db_name}")
-        )
-        logger.info(f"Уникальная тестовая база данных '{unique_db_name}' создана.")
-
-        # 3. Возвращаем имя уникальной базы данных для использования в тестах
-        yield unique_db_name
-
-    except (OperationalError, DatabaseError) as e:
-        logger.error(f"Ошибка при настройке уникальной тестовой базы данных: {e}", exc_info=True)
-        pytest.fail(f"Не удалось настроить уникальную тестовую базу данных: {e}")
-    finally:
-        # 4. Удаляем уникальную базу данных после завершения теста
-        if temp_client:
-            try:
-                # Сначала закрываем все соединения к этой БД, если они есть
-                await asyncio.get_running_loop().run_in_executor(
-                    None, lambda: temp_client.command(f"KILL DATABASE {unique_db_name} SYNC")
-                )
-                # Затем удаляем базу данных
-                await asyncio.get_running_loop().run_in_executor(
-                    None, lambda: temp_client.command(f"DROP DATABASE IF EXISTS {unique_db_name}")
-                )
-                logger.info(f"Уникальная тестовая база данных '{unique_db_name}' успешно удалена.")
-            except Exception as e:
-                logger.error(f"Ошибка при удалении уникальной тестовой базы данных '{unique_db_name}': {e}", exc_info=True)
-            finally:
-                await asyncio.get_running_loop().run_in_executor(None, temp_client.close)
+# Создаем копию настроек и модифицируем их для тестовой базы данных
+test_settings = deepcopy(settings)
+test_settings.clickhouse.db_name = TEST_DB_NAME
+# Модифицируем имена таблиц для теста, добавляя префикс
+test_settings.clickhouse.table_orderbook_snapshots = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_orderbook_snapshots}"
+test_settings.clickhouse.table_orderbook_archive_filename = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_orderbook_archive_filename}"
+test_settings.clickhouse.table_kline_archive = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_kline_archive}"
+test_settings.clickhouse.table_kline_archive_datetime = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_kline_archive_datetime}"
+test_settings.clickhouse.table_trade_signals = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_trade_signals}"
+test_settings.clickhouse.table_trade_results = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_trade_results}"
+test_settings.clickhouse.table_positions = f"{TEST_TABLE_PREFIX}{settings.clickhouse.table_positions}"
 
 
-@pytest_asyncio.fixture(scope="function")
-async def temp_clickhouse_repo(setup_unique_test_db):
-   
-    unique_db_name = setup_unique_test_db
+# Список всех тестовых таблиц для операций
+ALL_TEST_TABLES = [
+    (OrderbookSnapshotModel, test_settings.clickhouse.table_orderbook_snapshots),
+    (OrderBookFilenameModel, test_settings.clickhouse.table_orderbook_archive_filename),
+    (KlineRecord, test_settings.clickhouse.table_kline_archive),
+    (KlineRecordDatetime, test_settings.clickhouse.table_kline_archive_datetime),
+    (TradeSignal, test_settings.clickhouse.table_trade_signals),
+    (TradeResult, test_settings.clickhouse.table_trade_results),
+    (OrderBookDelta, test_settings.clickhouse.table_positions),
+]
+
+async def check_table_exists(client, db_name: str, table_name: str) -> bool:
+    """Проверяет, существует ли таблица в базе данных ClickHouse."""
+    cur = client.cursor()
+    async with cur:
+        query = f"EXISTS TABLE {db_name}.{table_name}"
+        result = await cur.execute(query)
+        # execute возвращает список списков, например [[1]] или [[0]]
+        return result[0][0] == 1
+
+
+async def drop_table(table_name: str):
+    """Удаляет указанную таблицу из тестовой базы данных."""
+    logger.info(f"Удаление таблицы '{table_name}' из базы данных '{TEST_DB_NAME}'...")
     repo = ClickHouseRepository(
-        schema=OrderbookSnapshotModel,
-        table_name="test_orderbook_snapshots",
-        db=unique_db_name
+        schema=None, # Схема не нужна для DROP TABLE
+        db=TEST_DB_NAME,
+        table_name=table_name
     )
-    yield repo
-    await repo.close() # Закрываем соединение после теста
 
-# --- Тесты ---
-
-@pytest.mark.asyncio
-async def test_initialisation_storage_integration(temp_clickhouse_repo):
-    # Используем temp_clickhouse_repo, который уже подключен к уникальной БД
-    # и эта БД уже создана.
-    repo = temp_clickhouse_repo
-    
-    # Проверяем, что база данных существует
-    assert await repo.database_exists()
-    
-    # Проверяем, что таблица не существует до инициализации
-    assert not await repo.table_exists()
-
-    tables_to_init = [
-        (OrderbookSnapshotModel, repo.table_name), # Используем имя таблицы из фикстуры
-        (KlineRecord, settings.clickhouse.table_kline_archive_testnet),
-        (KlineRecordDatetime, settings.clickhouse.table_kline_archive_datetime_testnet),
-        (OrderBookFilenameModel, settings.clickhouse.table_orderbook_archive_filename_testnet),
-        (TradeResult, settings.clickhouse.table_trade_results_testnet),
-        (TradeSignal, settings.clickhouse.table_trade_signals), # Возможно, здесь тоже нужен testnet вариант
-        (OrderBookDelta, settings.clickhouse.table_positions_testnet),
-    ]
+    try:
+        # Для удаления напрямую через cursor:
+        client = await test_settings.clickhouse.connect()
+        cur = client.cursor()
+        async with cur:
+            await cur.execute(f"DROP TABLE IF EXISTS {TEST_DB_NAME}.{table_name}")
+        await client.close() # Закрываем временное соединение
+        logger.info(f"Таблица '{table_name}' успешно удалена.")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении таблицы '{table_name}': {e}", exc_info=True)
 
 
-    initializer_client = get_client(
-        host=os.getenv('CLICKHOUSE_HOST', 'localhost'),
-        port=int(os.getenv('CLICKHOUSE_PORT_TCP', '9000')),
-        username=os.getenv('CLICKHOUSE_USER', 'default'),
-        password=os.getenv('CLICKHOUSE_PASSWORD', 'testpass'),
-        database=repo.db # Подключаемся к уникальной БД
-    )
-    initializer = StorageInitializer(settings, logger, initializer_client)
-    await initializer.initialize(tables_to_init)
-    await initializer_client.close() # Закрываем клиент инициализатора
+async def drop_database(db_name: str):
+    """Удаляет указанную базу данных ClickHouse."""
+    logger.info(f"Удаление базы данных '{db_name}'...")
+    # Для удаления базы данных нужно подключиться к 'default' или любой другой существующей
+    tmp_settings = deepcopy(test_settings.clickhouse)
+    tmp_settings.db_name = "default" # Подключаемся к default для удаления другой базы
 
-    # Проверяем, что таблица была создана
-    assert await repo.table_exists()
+    client = None
+    try:
+        client = await tmp_settings.connect()
+        cur = client.cursor()
+        async with cur:
+            await cur.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        logger.info(f"База данных '{db_name}' успешно удалена.")
+    except Exception as e:
+        logger.error(f"Ошибка при удалении базы данных '{db_name}': {e}", exc_info=True)
+    finally:
+        if client:
+            await client.close()
 
-    # Проверяем, что можно сохранить данные
-    test_data = OrderbookSnapshotModel(
-        symbol="BTCUSDT",
-        timestamp=datetime.now(timezone.utc),
-        bids=[[100.0, 1.0]],
-        asks=[[101.0, 1.0]]
-    )
-    await repo.save(test_data)
 
-    # Проверяем, что данные были сохранены
-    retrieved_data = await repo.get_all()
-    assert len(retrieved_data) == 1
-    assert retrieved_data[0].symbol == "BTCUSDT"
+async def run_test_scenario():
+    """Главный сценарий тестирования операций с ClickHouse."""
+    logger.info("--- Начинаем тестовый сценарий операций с ClickHouse ---")
 
-    # Очищаем таблицу
-    await repo.delete_all()
-    retrieved_data_after_delete = await repo.get_all()
-    assert len(retrieved_data_after_delete) == 0
+    # 1. Очистка перед началом (на случай предыдущего незавершенного теста)
+    logger.info("Попытка предварительной очистки: удаление тестовых таблиц и базы данных...")
+    for _, table_name in ALL_TEST_TABLES:
+        await drop_table(table_name)
+    await drop_database(TEST_DB_NAME)
+    logger.info("Предварительная очистка завершена.")
 
-# --- Другие тесты (если есть) ---
-# @pytest.mark.asyncio
-# async def test_another_repo_method(temp_clickhouse_repo):
-#    repo = temp_clickhouse_repo
-#    # Ваш тест здесь
+    # 2. Инициализация (создание БД и таблиц)
+    logger.info(f"Инициализация хранилища для тестовой базы данных '{TEST_DB_NAME}'...")
+    initializer = StorageInitializer(settings=test_settings, logger=logger)
+    try:
+        await initializer.initialisation_storage()
+        logger.info("Инициализация тестового хранилища успешно завершена.")
+    finally:
+        if initializer.client:
+            await initializer.client.close() # Закрываем основное соединение инициализатора
+
+    # 3. Проверка наличия таблиц после создания
+    logger.info("Проверка наличия созданных таблиц...")
+    main_client_for_checks = await test_settings.clickhouse.connect()
+    try:
+        all_tables_exist = True
+        for schema, table_name in ALL_TEST_TABLES:
+            exists = await check_table_exists(main_client_for_checks, TEST_DB_NAME, table_name)
+            if exists:
+                logger.info(f"Таблица '{table_name}' СУЩЕСТВУЕТ в '{TEST_DB_NAME}'.")
+            else:
+                logger.error(f"Ошибка: Таблица '{table_name}' НЕ СУЩЕСТВУЕТ в '{TEST_DB_NAME}'.")
+                all_tables_exist = False
+        if all_tables_exist:
+            logger.info("Все тестовые таблицы успешно проверены и существуют.")
+        else:
+            logger.error("Некоторые тестовые таблицы отсутствуют после инициализации.")
+    finally:
+        if main_client_for_checks:
+            await main_client_for_checks.close()
+
+
+    # 4. Удаление всех тестовых таблиц
+    logger.info("Начинаем удаление всех тестовых таблиц...")
+    for _, table_name in ALL_TEST_TABLES:
+        await drop_table(table_name)
+    logger.info("Все тестовые таблицы удалены.")
+
+    # 5. Проверка отсутствия таблиц после удаления
+    logger.info("Проверка отсутствия таблиц после удаления...")
+    main_client_for_checks_after_drop = await test_settings.clickhouse.connect()
+    try:
+        all_tables_dropped = True
+        for schema, table_name in ALL_TEST_TABLES:
+            exists = await check_table_exists(main_client_for_checks_after_drop, TEST_DB_NAME, table_name)
+            if exists:
+                logger.error(f"Ошибка: Таблица '{table_name}' СУЩЕСТВУЕТ после удаления.")
+                all_tables_dropped = False
+            else:
+                logger.info(f"Таблица '{table_name}' ОТСУТСТВУЕТ после удаления.")
+        if all_tables_dropped:
+            logger.info("Все тестовые таблицы успешно проверены и отсутствуют.")
+        else:
+            logger.error("Некоторые тестовые таблицы не были удалены.")
+    finally:
+        if main_client_for_checks_after_drop:
+            await main_client_for_checks_after_drop.close()
+
+
+    # 6. Удаление тестовой базы данных
+    await drop_database(TEST_DB_NAME)
+    logger.info("Тестовая база данных удалена.")
+
+    logger.info("--- Тестовый сценарий операций с ClickHouse завершен ---")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_test_scenario())

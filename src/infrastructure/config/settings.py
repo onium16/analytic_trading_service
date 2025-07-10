@@ -11,6 +11,7 @@ class ClickHouseSettings(BaseSettings):
     port_tcp: int = 9000
     port_http: int = 8123
     login: str = "default"
+    user: str = "default"
     password: str = ""
     
     db_name: str 
@@ -39,13 +40,13 @@ class ClickHouseSettings(BaseSettings):
         ]
         return {field: getattr(self, field) + "_testnet" for field in table_fields}
 
-    async def connect(self) -> Connection:
+    async def connect(self, use_db: bool=True) -> Connection:
         return Connection(
             host=self.host,
             port=self.port_tcp,
             user=self.login,
             password=self.password,
-            database=self.db_name,
+            database=self.db_name if use_db else "default" 
         )
 
     model_config = SettingsConfigDict(
