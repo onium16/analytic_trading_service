@@ -144,7 +144,7 @@ jobs:
 
     - name: Check if required ports are in use
       run: |
-        for port in 8123 9000 8123 19000; do
+        for port in 8123 9000 8123 9000; do
           echo "Checking if pot $port is in use:"
           if sudo lsof -i :$port; then
             echo "❌ Port $port is already in use!"
@@ -191,7 +191,7 @@ jobs:
         # Используем localhost и проброшенный порт 9000 для подключения
         # Пароль пустой, как указано в .env
         for i in {1..30}; do
-          echo "SELECT 1;" | clickhouse-client --host localhost --port 19000 --user default --password testpass && break
+          echo "SELECT 1;" | clickhouse-client --host localhost --port 9000 --user default --password testpass && break
           echo "Waiting for ClickHouse..."
           sleep 5
         done
