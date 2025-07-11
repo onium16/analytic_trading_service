@@ -60,10 +60,10 @@ jobs:
       CLICKHOUSE_PORT_HTTP: 8123
       CLICKHOUSE_USER: default
       CLICKHOUSE_LOGIN: default
-      CLICKHOUSE_PASSWORD: "testpass" # Изменено: пустой пароль для соответствия .env
+      CLICKHOUSE_PASSWORD: "testpass" 
 
       # ClickHouse DB settings (для Pydantic)
-      CLICKHOUSE_DB_NAME: test_db # Изменено: для соответствия .env
+      CLICKHOUSE_DB_NAME: test_db 
 
       # Tables names (для Pydantic)
       CLICKHOUSE_TABLE_KLINE_ARCHIVE: kline_archive
