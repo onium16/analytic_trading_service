@@ -48,8 +48,8 @@ settings.stream_source = False
 settings.stream_mode = False
 settings.use_ws = True # API/WebSocket)
 
-settings.start_time = "2022-06-16"
-settings.end_time = "2022-06-21"
+settings.start_time = "2025-06-16"
+settings.end_time = "2025-06-21"
 
 
 async def run_basktest_application():
@@ -68,40 +68,21 @@ async def run_basktest_application():
     if settings.archive_source and settings.stream_source:
         # flag snapshot_stream + delta по данным из всех источников делает поиск
         logger.info("Запуск оценки стратегий... По архивным и стриминговым данным совместно. Обновление параметров стратегий.")
-        backtest_runner = BacktestRunner(
-                archive_mode=True,
-                stream_mode=False,
-                archive_source=True,
-                stream_source=True
-            )
-        
-        await backtest_runner.run_backtest()
-
     if settings.archive_source :
         logger.info("Запуск оценки стратегий... По архивным данным. Обновление параметров стратегий.")
-        # Оцениваем стратегии
-        # flag delta
-        backtest_runner = BacktestRunner(
-                archive_mode=True,
-                stream_mode=False,
-                archive_source=True,
-                stream_source=False
-            )
-        
-        await backtest_runner.run_backtest()
-
     if settings.stream_source:
         logger.info("Запуск оценки стратегий... По архивным стриминговым данным...")
-        # Оцениваем стратегии
-        # flag snapshot_stream
-        backtest_runner = BacktestRunner(
-                archive_mode=True,
-                stream_mode=False,
-                archive_source=False,
-                stream_source=True
-            )
+    
+    backtest_runner = BacktestRunner(
+            archive_mode=True,
+            stream_mode=False,
+            archive_source=settings.archive_source,
+            stream_source=settings.stream_source
+        )
         
-        await backtest_runner.run_backtest()
+    await backtest_runner.run_backtest() 
+
+    logger.info("Режим тестирования стратегий завершен.")
 
 async def run_archive_application():
     

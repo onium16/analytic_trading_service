@@ -20,7 +20,7 @@ from backtesting import Backtest, Strategy
 from application._backtest_data import prepare_backtest_data
 from application._backtest_param_parser import parse_strategy_params_from_file
 from infrastructure.storage.repositories.clickhouse_repository import ClickHouseRepository
-from infrastructure.storage.schemas import KlineArchive, OrderBookArchive
+from infrastructure.storage.schemas import KlineArchive, OrderBookArchive, OrderbookSnapshotModel
 from domain.strategies.strategies import (
     S_AskAccumulationShort, S_BidAcc, S_BidExh, S_BidWall, S_AskAcc, 
     S_AskExh, S_ImbReversal, S_LiquidityTrap
@@ -236,7 +236,6 @@ class BacktestRunner:
                 entry_points = trades_df[trades_df['EntryBar'].notnull()]
                 exit_points = trades_df[trades_df['ExitBar'].notnull()]
 
-                
                 # Вычисляем координаты для входов
                 if not entry_points.empty and price_df is not None and 'Close' in price_df.columns:
                     valid_entry_indices = entry_points['EntryBar'].astype(int)
@@ -381,7 +380,7 @@ class BacktestRunner:
         try:
             # Подготовка данных
             repo_kline = ClickHouseRepository(schema=KlineArchive, db=self.DB_NAME, table_name=self.TABLE_KLINE_ARCHIVE)
-            repo_orderbook = ClickHouseRepository(schema=OrderBookArchive, db=self.DB_NAME, table_name=self.TABLE_ORDERBOOK_ARCHIVE)
+            repo_orderbook = ClickHouseRepository(schema=OrderbookSnapshotModel, db=self.DB_NAME, table_name=self.TABLE_ORDERBOOK_ARCHIVE)
             await repo_kline.ensure_table()
             await repo_orderbook.ensure_table()
 
@@ -405,7 +404,7 @@ class BacktestRunner:
         
         try:
             df_full = df_full.loc[(df_full["timestamp"] >= start_time_pd) & (df_full["timestamp"] <= end_time_pd)]
-                        
+
             if self.ARCHIVE_SOURCE and self.STREAM_SOURCE:
                 self.logger.info("Full sources are selected. Loading data from both archive and stream.")
 

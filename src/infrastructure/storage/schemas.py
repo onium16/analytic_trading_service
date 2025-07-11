@@ -49,6 +49,7 @@ class ReportSchema(BaseModel):
     number_of_trades: int
  
 class OrderbookSnapshotModel(BaseModel):
+    timestamp: datetime = Field(alias="ts")
     topic: str
     type: str
     ts: int 
