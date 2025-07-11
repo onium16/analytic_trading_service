@@ -173,18 +173,9 @@ class OrderbookSettings(BaseSettings):
 class Settings(BaseSettings):
     logger_level: str = PydanticField(default="INFO") 
 
-    clickhouse: ClickHouseSettings = PydanticField(default_factory=lambda: ClickHouseSettings(db_name="default"))
+    clickhouse: ClickHouseSettings = PydanticField(default_factory=lambda: ClickHouseSettings())
     bybit: BybitSettings = PydanticField(default_factory=lambda: BybitSettings())
-    binance: BinanceSettings = PydanticField(default_factory=lambda: BinanceSettings(
-        api_key="",
-        api_secret="",
-        base_url="",
-        kline_url="",
-        test_api_key="",
-        test_api_secret="",
-        test_base_url="",
-        test_kline_url=""
-    ))
+    binance: BinanceSettings = PydanticField(default_factory=lambda: BinanceSettings())
     backtesting: BacktestingSettings = PydanticField(
         default_factory=lambda: BacktestingSettings(
             default_file_settings="default_strategy_settings.json",
@@ -200,17 +191,18 @@ class Settings(BaseSettings):
     # Modes parameters
     testnet: bool
 
-    # archive_modes 
+    # archive_mode
     archive_mode: bool = False
     archive_source: bool = False
     stream_source: bool = False
 
-    # stream_modes
+    # backtest_mode
+    backtest_mode: bool = False
+
+    # stream_mode
     stream_mode: bool = False
     use_ws: bool = False # True - использовать вебсокеты, False - использовать API
 
-
-    # kline_interval: str = "1" # minutes
     folder_report: str = "reports"
     datasets_dir: str = "datasets"
     pair_tokens: str = "ETHUSDT"

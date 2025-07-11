@@ -194,7 +194,6 @@ class ClickHouseRepository(BaseRepository[T], Generic[T]):
             if not db_exists:
                 await loop.run_in_executor(None, lambda: self.client.command(f"CREATE DATABASE {db}"))
 
-
             table_exists_query = f"""
             SELECT name FROM system.tables
             WHERE database = '{db}' AND name = '{table}'

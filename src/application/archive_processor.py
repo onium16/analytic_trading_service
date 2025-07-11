@@ -67,7 +67,7 @@ class ArchiveProcessor:
             return
 
         processed_files = await self.repo_filenames.get_all()
-        processed_names = {rec.filename for rec in processed_files}
+        processed_names = {rec.data for rec in processed_files}
 
         for filename in async_tqdm(files, desc="Обработка архивов", unit="файл"):
             if filename in processed_names:

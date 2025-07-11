@@ -184,7 +184,7 @@ class KlineParser:
         elif re.fullmatch(r'\d{13}', date_str): # Таймстамп в миллисекундах (например, 1735689500000)
             return datetime.fromtimestamp(int(date_str) / 1000, tz=utc_zone).replace(tzinfo=None)
         else:
-            raise ValueError(f"Unsupported date format: {date_str}")
+            raise ValueError(f"Unsupported date format: {date_str}. Correct formats: YYYY-MM-DD, DD-MM-YYYY, Unix timestamp (in seconds or milliseconds)")
 
 
     async def fetch_and_save_day(self, date: datetime) -> None:

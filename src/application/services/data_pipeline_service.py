@@ -38,6 +38,8 @@ class DataPipelineService:
         
         self.orderbook_buffer_for_strategy: Dict[str, List[Dict[str, Any]]] = {}
 
+        self.last_orderbook_snapshot: Dict[str, Optional[Dict[str, Any]]] = {}
+
         self.repo_orderbook_init = ClickHouseRepository(
             schema=OrderbookSnapshotModel,
             table_name=settings.clickhouse.table_orderbook_snapshots,
@@ -95,10 +97,23 @@ class DataPipelineService:
                        (now - self.kline_db_batch_start_time.get(symbol, now)) > self.kline_db_batch_timer:
                         await self._save_kline_batch_to_db(symbol)
 
+    async def _orderbook_batch_saver_loop(self):
+        """Фоновый цикл для периодического сохранения батчей ордербуков в БД по таймеру."""
+        while True:
+            await asyncio.sleep(1) # Проверяем каждую секунду
+            now = asyncio.get_running_loop().time() 
+            symbols_to_process = list(self.orderbook_current_batch.keys()) 
+            
+            for symbol in symbols_to_process:
+                if symbol in self.orderbook_current_batch and self.orderbook_current_batch[symbol]:
+                    if len(self.orderbook_current_batch[symbol]) >= self.orderbook_batch_size or \
+                       (now - self.orderbook_batch_start_time.get(symbol, now)) > self.orderbook_batch_timer:
+                        await self._process_and_save_orderbook_batch(symbol)
+
     async def _save_kline_batch_to_db(self, symbol: str):
         """
         Сохраняет накопленный батч свечей в БД.
-        Uses a NEW ClickHouseRepository instance for each call to avoid concurrency issues.
+        Использует НОВЫЙ ClickHouseRepository instance для каждого вызова, чтобы избежать проблем с параллелизмом.
         """
         if not self.kline_current_batch_db.get(symbol):
             return
@@ -117,6 +132,8 @@ class DataPipelineService:
                 logger.error(f"[KLINE DB] Ошибка валидации KlineRecord для {symbol}: {e}. Данные: {kline_for_db}", exc_info=True)
         
         if records_for_db:
+            # Revert to creating a NEW ClickHouseRepository instance for each call.
+            # This is necessary because clickhouse-connect clients are not thread-safe/async-concurrent.
             temp_repo_kline = ClickHouseRepository(
                 schema=KlineRecord,
                 table_name=settings.clickhouse.table_kline_archive,
@@ -132,31 +149,32 @@ class DataPipelineService:
                 self.kline_db_batch_start_time[symbol] = asyncio.get_running_loop().time()
 
 
-    async def _orderbook_batch_saver_loop(self):
-        """Фоновый цикл для периодического сохранения батчей ордербуков в БД по таймеру."""
-        while True:
-            await asyncio.sleep(1) # Проверяем каждую секунду
-            now = asyncio.get_running_loop().time() 
-            symbols_to_process = list(self.orderbook_current_batch.keys()) 
-            
-            for symbol in symbols_to_process:
-                if symbol in self.orderbook_current_batch and self.orderbook_current_batch[symbol]:
-                    if len(self.orderbook_current_batch[symbol]) >= self.orderbook_batch_size or \
-                       (now - self.orderbook_batch_start_time.get(symbol, now)) > self.orderbook_batch_timer:
-                        await self._process_and_save_orderbook_batch(symbol)
-
-
     async def _process_and_save_orderbook_batch(self, symbol: str):
         """
         Обрабатывает и сохраняет накопленный батч ордербуков в БД.
-        Добавляет анализированные данные в orderbook_buffer_for_strategy, но НЕ очищает этот буфер.
-        Uses a NEW ClickHouseRepository instance for each call to avoid concurrency issues.
+        Добавляет анализированные данные в orderbook_buffer_for_strategy.
+        Использует НОВЫЙ ClickHouseRepository instance для каждого вызова, чтобы избежать проблем с параллелизмом.
         """
         if not self.orderbook_current_batch.get(symbol):
             return
 
-        batch_to_process = self.orderbook_current_batch[symbol]
-        df = pd.DataFrame(batch_to_process)
+        last_snapshot_in_current_raw_batch = self.orderbook_current_batch[symbol][-1].copy()
+
+        temp_batch_for_analysis = list(self.orderbook_current_batch[symbol])
+
+        if symbol in self.last_orderbook_snapshot and self.last_orderbook_snapshot[symbol] is not None:
+            current_first_ts = temp_batch_for_analysis[0].get('ts', temp_batch_for_analysis[0].get('timestamp'))
+            last_saved_ts = self.last_orderbook_snapshot[symbol].get('ts', self.last_orderbook_snapshot[symbol].get('timestamp'))
+
+            if last_saved_ts < current_first_ts:
+                temp_batch_for_analysis.insert(0, self.last_orderbook_snapshot[symbol])
+                logger.debug(f"[ORDERBOOK] Добавлен предыдущий снимок в начало батча для анализа {symbol}. "
+                             f"Текущий батч начинается с TS {current_first_ts}, добавлен предыдущий с TS {last_saved_ts}.")
+            else:
+                logger.warning(f"[ORDERBOOK] Пропущен добавление предыдущего снимка для {symbol} из-за порядка временных меток "
+                               f"(Last saved TS: {last_saved_ts}, Current first TS: {current_first_ts}).")
+
+        df = pd.DataFrame(temp_batch_for_analysis)
 
         if 'ts' not in df.columns and 'timestamp' in df.columns:
             df['ts'] = df['timestamp']
@@ -165,6 +183,7 @@ class DataPipelineService:
         
         if 's' not in df.columns or df['s'].isnull().all():
             logger.error(f"Не удалось определить символ ('s') в батче ордербуков для анализа. Пропускаем батч.")
+            self.last_orderbook_snapshot[symbol] = last_snapshot_in_current_raw_batch
             self.orderbook_current_batch[symbol].clear()
             self.orderbook_batch_start_time[symbol] = asyncio.get_running_loop().time()
             return
@@ -172,10 +191,23 @@ class DataPipelineService:
         analyzed_df = self.analyzer.archive_analyze(df)
         
         if not analyzed_df.empty:
-            records_to_save_dicts = analyzed_df.to_dict(orient="records")
-            
+            records_for_strategy = analyzed_df.to_dict(orient="records")
+            records_for_db = analyzed_df.to_dict(orient="records")
+
+            if len(records_for_db) > 0:
+                records_for_db = records_for_db[1:]
+            if len(records_for_strategy) > 0:
+                records_for_strategy = records_for_strategy[1:]
+            logger.debug(f"[ORDERBOOK] Удалена первая (связующая) запись из analyzed_df для {symbol} перед сохранением/стратегией.")
+
+            if symbol not in self.orderbook_buffer_for_strategy:
+                self.orderbook_buffer_for_strategy[symbol] = []
+            self.orderbook_buffer_for_strategy[symbol].extend(records_for_strategy)
+            logger.debug(f"[ORDERBOOK] Добавлено {len(records_for_strategy)} записей в orderbook_buffer_for_strategy для {symbol}. "
+                         f"Текущий размер: {len(self.orderbook_buffer_for_strategy[symbol])}")
+
             valid_records = []
-            for record_dict in records_to_save_dicts:
+            for record_dict in records_for_db:
                 try:
                     if 's' not in record_dict or record_dict['s'] is None:
                         logger.warning(f"Символ 's' отсутствует в записи ордербука для сохранения: {record_dict}. Пропускаем эту запись.")
@@ -200,7 +232,8 @@ class DataPipelineService:
                     logger.error(f"Ошибка валидации OrderbookSnapshotModel: {e}. Дан данные: {record_dict}", exc_info=True)
             
             if valid_records:
-
+                # Revert to creating a NEW ClickHouseRepository instance for each call.
+                # This is necessary because clickhouse-connect clients are not thread-safe/async-concurrent.
                 temp_repo_orderbook = ClickHouseRepository(
                     schema=OrderbookSnapshotModel,
                     table_name=settings.clickhouse.table_orderbook_snapshots,
@@ -211,21 +244,14 @@ class DataPipelineService:
                     logger.info(f"[ORDERBOOK DB] Сохранено {len(valid_records)} анализированных записей в БД для {symbol}.")
                 except Exception as e:
                     logger.error(f"[ORDERBOOK DB] Ошибка при сохранении батча ордербуков для {symbol}: {e}", exc_info=True)
-                finally:
-                    # Добавляем анализированные данные в буфер для стратегии
-                    if symbol not in self.orderbook_buffer_for_strategy:
-                        self.orderbook_buffer_for_strategy[symbol] = []
-                    self.orderbook_buffer_for_strategy[symbol].extend(analyzed_df.to_dict(orient="records"))
-                    logger.debug(f"[ORDERBOOK] Добавлено {len(analyzed_df)} записей в orderbook_buffer_for_strategy для {symbol}. Текущий размер: {len(self.orderbook_buffer_for_strategy[symbol])}")
-
-                    self.orderbook_current_batch[symbol].clear()
-                    self.orderbook_batch_start_time[symbol] = asyncio.get_running_loop().time()
             else:
                 logger.warning(f"[ORDERBOOK DB] Нет валидных записей для сохранения в БД для {symbol}.")
         else:
             logger.warning(f"[ORDERBOOK] analyze_df пуст для {symbol}. Нечего сохранять или передавать стратегии.")
-            self.orderbook_current_batch[symbol].clear()
-            self.orderbook_batch_start_time[symbol] = asyncio.get_running_loop().time()
+
+        self.last_orderbook_snapshot[symbol] = last_snapshot_in_current_raw_batch
+        self.orderbook_current_batch[symbol].clear()
+        self.orderbook_batch_start_time[symbol] = asyncio.get_running_loop().time()
             
     async def handle_kline_data(self, event: Union[KlineDataReceivedEvent | KlineDataReceivedWsEvent]):
         """Обрабатывает полученные данные свечи."""

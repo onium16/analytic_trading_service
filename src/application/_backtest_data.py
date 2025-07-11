@@ -69,9 +69,10 @@ async def prepare_backtest_data(
         # Асинхронная загрузка
         try:
             kline_df = await repo_kline.fetch_dataframe(kline_query)
-            if kline_df is None or kline_df.empty:
+            if kline_df is None or kline_df.empty or "timestamp" not in kline_df.columns:
+                logger.warning(f"kline_df пуст или не содержит колонку 'timestamp'.")
                 logger.warning(f"Нет данных в таблице {repo_kline.db}.{repo_kline.table_name} за период {start_str} - {end_str}")
-                kline_df = pd.DataFrame()
+                return pd.DataFrame()
             logger.debug(f"Kline columns: {kline_df.columns.tolist()}")
             
         except Exception as e:
@@ -80,9 +81,10 @@ async def prepare_backtest_data(
 
         try:
             orderbook_df = await repo_orderbook.fetch_dataframe(orderbook_query)
-            if orderbook_df is None or orderbook_df.empty:
-                orderbook_df = pd.DataFrame()
+            if orderbook_df is None or orderbook_df.empty or "ts" not in orderbook_df.columns:
+                logger.warning(f"orderbook_df пуст или не содержит колонку 'ts'.")
                 logger.warning(f"Нет данных в таблице {repo_orderbook.db}.{repo_orderbook.table_name} за период {start_str} - {end_str}")
+                return pd.DataFrame()
             logger.debug(f"Orderbook columns: {orderbook_df.columns.tolist()}")
         except Exception as e:
             logger.exception("Ошибка при получении данных из OrderBook таблицы")
@@ -95,11 +97,12 @@ async def prepare_backtest_data(
 
     else:
         logger.info("Режим без БД. Ожидается загрукза данных в DataFrame`s.")
+        
+        if kline_df is None or kline_df.empty or "timestamp" not in kline_df.columns:
+            raise ValueError("kline_df не найден, пуст или не содержит колонку 'timestamp'.")
 
-        if kline_df is None or kline_df.empty:
-            raise ValueError("kline_df не найден или пуст.")
-        if orderbook_df is None or orderbook_df.empty:
-            raise ValueError("orderbook_df не найден или пуст.")
+        if orderbook_df is None or orderbook_df.empty or "ts" not in orderbook_df.columns:
+            raise ValueError("orderbook_df не найден, пуст или не содержит колонку 'ts'.")
 
 
     logger.info(f"Found {len(kline_df) if kline_df is not None else 0} kline rows and {len(orderbook_df) if orderbook_df is not None else 0} orderbook rows.")

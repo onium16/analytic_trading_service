@@ -32,19 +32,24 @@ from infrastructure.adapters.archive_kline_parser import KlineParser
 logger = setup_logger(__name__, level=settings.logger_level)
 
 # Выбрать тестовую сеть мы можем только при работе св режиме стриминга
-TEST_NET = True
+settings.testnet = False
 
 # Collect archive data (zip, parsing)
-ARCHIVE_MODE = False
+settings.archive_mode = True
 
 # Backtest strategies on archive data or stream data 
-BACKTEST_MODE = False
-ARCHIVE_SOURCE = True
-STREAM_SOURCE = False
+settings.backtest_mode= True
+
+# Collect archive data and backtest data
+settings.archive_source = True
+settings.stream_source = False
 
 # Stream data + Air BackTesting + Trading
-STREAM_MODE = True
-USE_WS = False # API/WebSocket)
+settings.stream_mode = False
+settings.use_ws = True # API/WebSocket)
+
+settings.start_time = "2022-06-16"
+settings.end_time = "2022-06-21"
 
 
 async def run_basktest_application():
@@ -56,11 +61,11 @@ async def run_basktest_application():
 
     # Backtesting в BACKTEST_MODE работает на архивных данных из указанных источников. 
     # Проверяет наличие данных за указанный период. Если есть то работаем если нет то отказ.
-    if not ARCHIVE_SOURCE and not STREAM_SOURCE:
+    if not settings.archive_source and not settings.stream_source:
         logger.error("Тестовый режим не может быть запущен без источников данных.")
         sys.exit(1)
 
-    if ARCHIVE_SOURCE and STREAM_SOURCE:
+    if settings.archive_source and settings.stream_source:
         # flag snapshot_stream + delta по данным из всех источников делает поиск
         logger.info("Запуск оценки стратегий... По архивным и стриминговым данным совместно. Обновление параметров стратегий.")
         backtest_runner = BacktestRunner(
@@ -72,7 +77,7 @@ async def run_basktest_application():
         
         await backtest_runner.run_backtest()
 
-    if ARCHIVE_SOURCE :
+    if settings.archive_source :
         logger.info("Запуск оценки стратегий... По архивным данным. Обновление параметров стратегий.")
         # Оцениваем стратегии
         # flag delta
@@ -85,7 +90,7 @@ async def run_basktest_application():
         
         await backtest_runner.run_backtest()
 
-    if STREAM_SOURCE:
+    if settings.stream_source:
         logger.info("Запуск оценки стратегий... По архивным стриминговым данным...")
         # Оцениваем стратегии
         # flag snapshot_stream
@@ -236,29 +241,53 @@ async def run_stream_application(use_ws: bool = False):
     logger.info("Завершение приложения.")
 
 async def main():
+    if settings.testnet:
+        logger.info("Запуск приложения в режиме TEST_NET...")
+    else:
+        logger.info("Запуск приложения в режиме PRODUCTION...")
+
+    if not settings.archive_mode and not settings.backtest_mode and not settings.stream_source:
+        logger.error("Ни один режим не выбран. Выберите хотя бы один режим для начала работыю.") 
+    
+
     try:
-        # Проверяем флаг тестнет и применяем настройки все параметры (базыданных и таблицы используюстя с префиксом _testnet
-        # все адреса API и т.д. testnet 
-        apply_environment_settings(settings, TEST_NET)
+        # --- ШАГ 1: Применяем настройки окружения (тестнет/боевая) ПЕРЕД ВСЕМИ ИНИЦИАЛИЗАЦИЯМИ ---
+        # Это гарантирует, что все последующие объекты будут использовать актуальные настройки.
+        apply_environment_settings(settings, settings.testnet)
+        logger.info(f"Настройки среды применены. Используется TEST_NET: {settings.testnet}")
+        # После этой строки, settings.clickhouse.db_name и другие параметры уже должны быть обновлены.
 
+        # --- ШАГ 2: Подключение к ClickHouse и инициализация хранилища ---
+        # Теперь client будет использовать обновленные настройки из 'settings'
         client = await settings.clickhouse.connect(use_db=False)
-
         initializer = StorageInitializer(settings, logger, client)
-        StorageInitializer(settings, logger, client)
         await initializer.initialisation_storage()
+        logger.info("Хранилище ClickHouse инициализировано.")
 
-        if ARCHIVE_MODE and not TEST_NET:
+        # --- ШАГ 3: Запуск режимов в соответствии с флагами ---
+        if settings.archive_mode and not settings.testnet:
+            logger.info("Запуск режима ARCHIVE_MODE.")
             await run_archive_application()
-        if BACKTEST_MODE:
+        elif settings.archive_mode and settings.testnet:
+            logger.warning("Режим ARCHIVE_MODE не запускается в тестовой сети (settings.testnet = True).")
+
+        if settings.backtest_mode:
+            logger.info("Запуск режима BACKTEST_MODE.")
             await run_basktest_application()
-        if STREAM_MODE and USE_WS is not None:
-            await run_stream_application(use_ws=USE_WS)
+        
+        # Условие для стриминга: просто проверяем флаг STREAM_MODE
+        if settings.stream_source:
+            logger.info(f"Запуск режима STREAM_MODE. Использование WebSocket: {settings.use_ws}")
+            await run_stream_application(use_ws=settings.use_ws)
+        else:
+            logger.info("Режим STREAM_MODE отключен.")
 
         logger.info("Программа завершена.")
     except Exception as e:
         logger.exception(f"Произошла непредвиденная ошибка при запуске приложения: {e}")
         return 1
     return 0
+
     
 
 if __name__ == "__main__":

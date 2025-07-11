@@ -380,8 +380,8 @@ class BacktestRunner:
 
         try:
             # Подготовка данных
-            repo_kline = ClickHouseRepository(schema=KlineArchive, db=self.DB_NAME, table_name=self.TABLE_KLINE_ARCHIVE, port=8123)
-            repo_orderbook = ClickHouseRepository(schema=OrderBookArchive, db=self.DB_NAME, table_name=self.TABLE_ORDERBOOK_ARCHIVE, port=8123)
+            repo_kline = ClickHouseRepository(schema=KlineArchive, db=self.DB_NAME, table_name=self.TABLE_KLINE_ARCHIVE)
+            repo_orderbook = ClickHouseRepository(schema=OrderBookArchive, db=self.DB_NAME, table_name=self.TABLE_ORDERBOOK_ARCHIVE)
             await repo_kline.ensure_table()
             await repo_orderbook.ensure_table()
 

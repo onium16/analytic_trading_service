@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 
 class OrderbookRecord(BaseModel):
     timestamp: int
@@ -18,7 +18,8 @@ class OrderBookSnapshot(BaseModel):
     asks: List[Tuple[Decimal, Decimal]]
 
 class OrderBookFilenameModel(BaseModel):
-    filename: str
+    data: Optional[str] = None
+    data_processed: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class OrderBookDelta(BaseModel):
     timestamp: datetime
