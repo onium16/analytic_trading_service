@@ -1,43 +1,43 @@
 {
   "S_BidAcc": {
     "period": {"type": "integer", "values": [5]},
-    "delta_threshold_mult": {"type": "float", "values": [1.0]},
-    "cv_buy_threshold": {"type": "float", "values": [1.0]},
-    "top10_buy_threshold": {"type": "float", "values": [0.8]}
+    "delta_threshold_mult": {"type": "float", "values": [2.0]},
+    "cv_buy_threshold": {"type": "float", "values": [1.5]},
+    "top10_buy_threshold": {"type": "float", "values": [1.0]}
   },
   "S_AskAccumulationShort": {
-    "period": {"type": "integer", "values": [5]},
-    "delta_threshold_mult": {"type": "float", "values": [1.0]},
-    "cv_sell_threshold": {"type": "float", "values": [1.0]},
+    "period": {"type": "integer", "values": [7]},
+    "delta_threshold_mult": {"type": "float", "values": [1.5]},
+    "cv_sell_threshold": {"type": "float", "values": [0.5]},
     "top10_sell_threshold": {"type": "float", "values": [0.8]}
   },
   "S_BidExh": {
-    "reversal_delta_threshold": {"type": "float", "values": [-70.0]},
-    "cv_increase_mult": {"type": "float", "values": [0.5]}
+    "reversal_delta_threshold": {"type": "float", "values": [-100.0]},
+    "cv_increase_mult": {"type": "float", "values": [1.0]}
   },
   "S_BidWall": {
-    "delta_bid_threshold": {"type": "integer", "values": [100]},
-    "cv_high": {"type": "float", "values": [2.0]},
-    "top10_high": {"type": "float", "values": [0.9]},
-    "price_approach_zone": {"type": "float", "values": [0.005]}
+    "delta_bid_threshold": {"type": "integer", "values": [50]},
+    "cv_high": {"type": "float", "values": [2.5]},
+    "top10_high": {"type": "float", "values": [1.0]},
+    "price_approach_zone": {"type": "float", "values": [0.002]}
   },
   "S_AskAcc": {
-    "period": {"type": "integer", "values": [5]},
-    "delta_threshold_mult": {"type": "float", "values": [1.0]},
-    "cv_sell_threshold": {"type": "float", "values": [1.0]},
-    "top10_sell_threshold": {"type": "float", "values": [0.8]}
+    "period": {"type": "integer", "values": [7]},
+    "delta_threshold_mult": {"type": "float", "values": [2.0]},
+    "cv_sell_threshold": {"type": "float", "values": [0.5]},
+    "top10_sell_threshold": {"type": "float", "values": [0.6]}
   },
   "S_AskExh": {
-    "reversal_delta_threshold": {"type": "float", "values": [-70.0]},
-    "cv_increase_mult": {"type": "float", "values": [0.5]}
+    "reversal_delta_threshold": {"type": "float", "values": [-100.0]},
+    "cv_increase_mult": {"type": "float", "values": [1.0]}
   },
   "S_ImbReversal": {
-    "extreme_imb_threshold": {"type": "integer", "values": [150]},
-    "reversal_delta_threshold": {"type": "integer", "values": [30]}
+    "extreme_imb_threshold": {"type": "integer", "values": [200]},
+    "reversal_delta_threshold": {"type": "integer", "values": [50]}
   },
   "S_LiquidityTrap": {
-    "delta_top10_large_change": {"type": "float", "values": [0.05]},
-    "price_no_move_threshold": {"type": "float", "values": [0.0001]},
+    "delta_top10_large_change": {"type": "float", "values": [0.07]},
+    "price_no_move_threshold": {"type": "float", "values": [0.00005]},
     "cv_high": {"type": "float", "values": [2.0]}
   }
 }

@@ -51,7 +51,6 @@ settings.use_ws = True # API/WebSocket)
 settings.start_time = "2025-06-16"
 settings.end_time = "2025-06-21"
 
-
 async def run_basktest_application():
     """
     Функция запуска процессора для тестового режима стратегий на архивных данных из архивных или стриминговых данных.

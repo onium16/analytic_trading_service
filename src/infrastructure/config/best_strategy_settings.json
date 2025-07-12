@@ -29,7 +29,7 @@
         "reversal_delta_threshold": {
             "type": "integer",
             "values": [
-                -100
+                -90
             ]
         },
         "cv_increase_mult": {
@@ -69,13 +69,13 @@
         "period": {
             "type": "integer",
             "values": [
-                8
+                4
             ]
         },
         "delta_threshold_mult": {
             "type": "float",
             "values": [
-                1.0
+                0.8
             ]
         },
         "cv_sell_threshold": {
@@ -87,7 +87,7 @@
         "top10_sell_threshold": {
             "type": "float",
             "values": [
-                0.6
+                1.0
             ]
         }
     },
@@ -95,7 +95,7 @@
         "reversal_delta_threshold": {
             "type": "integer",
             "values": [
-                -100
+                -90
             ]
         },
         "cv_increase_mult": {
@@ -109,13 +109,13 @@
         "extreme_imb_threshold": {
             "type": "integer",
             "values": [
-                70
+                100
             ]
         },
         "reversal_delta_threshold": {
             "type": "integer",
             "values": [
-                45
+                40
             ]
         }
     },
@@ -123,19 +123,19 @@
         "delta_top10_large_change": {
             "type": "float",
             "values": [
-                0.07
+                0.1
             ]
         },
         "price_no_move_threshold": {
             "type": "float",
             "values": [
-                5e-05
+                8e-05
             ]
         },
         "cv_high": {
             "type": "float",
             "values": [
-                1.5
+                2.0
             ]
         }
     },
@@ -149,7 +149,7 @@
         "delta_threshold_mult": {
             "type": "float",
             "values": [
-                1.0
+                1.2
             ]
         },
         "cv_sell_threshold": {
@@ -161,7 +161,7 @@
         "top10_sell_threshold": {
             "type": "float",
             "values": [
-                0.6
+                0.7
             ]
         }
     }

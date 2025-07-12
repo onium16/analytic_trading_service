@@ -1,44 +1,43 @@
 {
-    "S_BidAcc": {
-      "period": {"type": "range", "start": 2, "stop": 6, "step": 1},
-      "delta_threshold_mult": {"type": "list", "values": [0.5, 1.0, 1.5, 2.0]},
-      "cv_buy_threshold": {"type": "list", "values": [0.5, 1.0, 1.5, 2.0]},
-      "top10_buy_threshold": {"type": "list", "values": [0.6, 0.8, 0.9, 1.0]}
-    },
-    "S_AskAccumulationShort": {
-      "period": {"type": "list", "values": [3, 5, 7]},
-      "delta_threshold_mult": {"type": "list", "values": [0.5, 1.0, 1.5]},
-      "cv_sell_threshold": {"type": "list", "values": [0.5, 1.0, 1.5]},
-      "top10_sell_threshold": {"type": "list", "values": [0.6, 0.8, 0.9]}
-    },
-    "S_BidExh": {
-      "reversal_delta_threshold": {"type": "range", "start": -100, "stop": -40, "step": 10},
-      "cv_increase_mult": {"type": "list", "values": [0.3, 0.5, 0.7, 1.0]}
-    },
-    "S_BidWall": {
-      "delta_bid_threshold": {"type": "range", "start": 50, "stop": 201, "step": 25},
-      "cv_high": {"type": "list", "values": [1.5, 2.0, 2.5, 3.0]},
-      "top10_high": {"type": "list", "values": [0.7, 0.8, 0.9, 1.0]},
-      "price_approach_zone": {"type": "list", "values": [0.002, 0.005, 0.01]}
-    },
-    "S_AskAcc": {
-      "period": {"type": "range", "start": 3, "stop": 10, "step": 1},
-      "delta_threshold_mult": {"type": "list", "values": [0.5, 1.0, 1.5, 2.0]},
-      "cv_sell_threshold": {"type": "list", "values": [0.5, 1.0, 1.5, 2.0]},
-      "top10_sell_threshold": {"type": "list", "values": [0.6, 0.8, 0.9, 1.0]}
-    },
-    "S_AskExh": {
-      "reversal_delta_threshold": {"type": "range", "start": -100, "stop": -40, "step": 10},
-      "cv_increase_mult": {"type": "list", "values": [0.3, 0.5, 0.7, 1.0]}
-    },
-    "S_ImbReversal": {
-      "extreme_imb_threshold": {"type": "range", "start": 50, "stop": 201, "step": 10},
-      "reversal_delta_threshold": {"type": "range", "start": 10, "stop": 51, "step": 5}
-    },
-    "S_LiquidityTrap": {
-      "delta_top10_large_change": {"type": "list", "values": [0.03, 0.05, 0.07, 0.1]},
-      "price_no_move_threshold": {"type": "list", "values": [0.00005, 0.0001, 0.0002, 0.0005]},
-      "cv_high": {"type": "list", "values": [1.5, 2.0, 2.5, 3.0]}
-    }
+  "S_BidAcc": {
+    "period": {"type": "range", "start": 3, "stop": 6, "step": 1},
+    "delta_threshold_mult": {"type": "list", "values": [0.8, 1.0, 1.5, 2.0]},
+    "cv_buy_threshold": {"type": "list", "values": [0.8, 1.0, 1.5, 2.0]},
+    "top10_buy_threshold": {"type": "list", "values": [0.7, 0.8, 0.9, 1.0]}
+  },
+  "S_AskAccumulationShort": {
+    "period": {"type": "list", "values": [3, 5, 7]},
+    "delta_threshold_mult": {"type": "list", "values": [0.8, 1.0, 1.2, 1.5]},
+    "cv_sell_threshold": {"type": "list", "values": [0.5, 0.8, 1.0, 1.2]},
+    "top10_sell_threshold": {"type": "list", "values": [0.7, 0.8, 0.9]}
+  },
+  "S_BidExh": {
+    "reversal_delta_threshold": {"type": "range", "start": -90, "stop": -50, "step": 10},
+    "cv_increase_mult": {"type": "list", "values": [0.5, 0.7, 1.0]}
+  },
+  "S_BidWall": {
+    "delta_bid_threshold": {"type": "range", "start": 50, "stop": 150, "step": 25},
+    "cv_high": {"type": "list", "values": [1.8, 2.0, 2.5, 3.0]},
+    "top10_high": {"type": "list", "values": [0.8, 0.9, 1.0]},
+    "price_approach_zone": {"type": "list", "values": [0.002, 0.003, 0.005]}
+  },
+  "S_AskAcc": {
+    "period": {"type": "range", "start": 4, "stop": 8, "step": 1},
+    "delta_threshold_mult": {"type": "list", "values": [0.8, 1.0, 1.5, 2.0]},
+    "cv_sell_threshold": {"type": "list", "values": [0.5, 0.8, 1.0, 1.2]},
+    "top10_sell_threshold": {"type": "list", "values": [0.7, 0.8, 0.9, 1.0]}
+  },
+  "S_AskExh": {
+    "reversal_delta_threshold": {"type": "range", "start": -90, "stop": -50, "step": 10},
+    "cv_increase_mult": {"type": "list", "values": [0.5, 0.7, 1.0]}
+  },
+  "S_ImbReversal": {
+    "extreme_imb_threshold": {"type": "range", "start": 75, "stop": 175, "step": 25},
+    "reversal_delta_threshold": {"type": "range", "start": 20, "stop": 45, "step": 5}
+  },
+  "S_LiquidityTrap": {
+    "delta_top10_large_change": {"type": "list", "values": [0.04, 0.05, 0.07, 0.1]},
+    "price_no_move_threshold": {"type": "list", "values": [0.00008, 0.0001, 0.0002]},
+    "cv_high": {"type": "list", "values": [1.8, 2.0, 2.5]}
   }
-  
+}
