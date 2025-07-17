@@ -477,7 +477,7 @@ class BacktestRunner:
                         start_opt_time = datetime.datetime.now()
                         try:
                             # Извлекаем специальные аргументы для optimize()
-                            maximize_metric = optimize_config.pop('maximize', 'Return [%]')
+                            maximize_metric = optimize_config.pop('maximize', 'Win Rate [%]') # было ' Return [%]') 
                             constraint_func = optimize_config.pop('constraint', None)
 
                             optimized_output = bt.optimize(
